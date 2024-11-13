@@ -302,7 +302,7 @@ class Surfer_GSC_Drop_Monitor {
 			'Content-Type: text/html; charset=UTF-8',
 		);
 
-		$email_sent = wp_mail( get_admin_url(), $title, $message, $headers );
+		$email_sent = wp_mail( get_option( 'admin_email' ), $title, $message, $headers );
 		if ( $email_sent ) {
 			Surfer()->get_surfer_tracking()->track_wp_event( 'report_email_sent', home_url() );
 			set_transient( 'surfer_gsc_weekly_report_email_sent', gmdate( 'm-d-Y H:i:s' ), 7 * DAY_IN_SECONDS );
@@ -576,11 +576,11 @@ class Surfer_GSC_Drop_Monitor {
 			wp_die();
 		}
 
-		$query        = $data['query'];
-		$current_page = $data['page'];
-		$per_page     = $data['perPage'];
-		$filter       = $data['filter'];
-		$sorting      = $data['sorting'];
+		$query        = sanitize_text_field( $data['query'] );
+		$current_page = absint( $data['page'] );
+		$per_page     = absint( $data['perPage'] );
+		$filter       = sanitize_key( $data['filter'] );
+		$sorting      = sanitize_key( $data['sorting'] );
 
 		$return = new stdClass();
 
@@ -657,7 +657,7 @@ class Surfer_GSC_Drop_Monitor {
 			}
 
 			if ( ! $count_only ) {
-				$sql .= ' ORDER BY ' . $sorting;
+				$sql .= $wpdb->prepare( ' ORDER BY %s', $sorting );
 				$sql .= $wpdb->prepare( ' LIMIT %d OFFSET %d', $per_page, ( $current_page - 1 ) * $per_page );
 			}
 

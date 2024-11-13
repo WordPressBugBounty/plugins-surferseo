@@ -15,7 +15,7 @@ use SurferSEO\Surfer\Surfer_GSC;
 use WP_REST_Response;
 
 /**
- * Object responsible for handlig all Surfer features.
+ * Object responsible for handling all Surfer features.
  */
 class Surfer {
 
@@ -41,7 +41,7 @@ class Surfer {
 	protected $surfer_privacy_policy = 'https://surferseo.com/privacy-policy/';
 
 	/**
-	 * Class that hadnle importing content from Surfer/GoogleDocs into WordPress.
+	 * Class that handle importing content from Surfer/GoogleDocs into WordPress.
 	 *
 	 * @var Content_Importer
 	 */
@@ -55,7 +55,7 @@ class Surfer {
 	protected $content_exporter = null;
 
 	/**
-	 * Class that handle writing guidlines sidebar.
+	 * Class that handle writing guidelines sidebar.
 	 *
 	 * @var Surfer_Sidebar
 	 */
@@ -529,8 +529,8 @@ class Surfer {
 		$args['post_status']      = $metadata['postStatus']['value'] ?? '';
 		$args['post_type']        = $metadata['postType']['value'] ?? '';
 		$args['post_name']        = $request->get_param( 'url' );
-		$args['meta_title']       = $request->get_param( 'meta_title' );
-		$args['meta_description'] = $request->get_param( 'meta_description' );
+		$args['meta_title']       = $metadata['postMetaTitle'] ?? '';
+		$args['meta_description'] = $metadata['postMetaDescription'] ?? '';
 		$args['draft_id']         = $request->get_param( 'draft_id' );
 		$args['permalink_hash']   = $request->get_param( 'permalink_hash' );
 		$args['keywords']         = $request->get_param( 'keywords' );
@@ -652,17 +652,19 @@ class Surfer {
 				}
 
 				$posts[] = array(
-					'id'          => $post->ID,
-					'title'       => $post->post_title,
-					'status'      => $post->post_status,
-					'created_at'  => $post->post_date,
-					'modified_at' => $post->post_modified,
-					'post_type'   => $post->post_type,
-					'url'         => get_permalink( $post ),
-					'edit_url'    => $this->get_edit_post_link( $post->ID, 'notdisplay' ),
-					'author'      => $author,
-					'categories'  => $this->convert_categories_to_surfer_select( $post->ID ),
-					'tags'        => $this->convert_tags_to_surfer_select( $post->ID ),
+					'id'               => $post->ID,
+					'title'            => $post->post_title,
+					'status'           => $post->post_status,
+					'created_at'       => $post->post_date,
+					'modified_at'      => $post->post_modified,
+					'post_type'        => $post->post_type,
+					'url'              => get_permalink( $post ),
+					'edit_url'         => $this->get_edit_post_link( $post->ID, 'notdisplay' ),
+					'author'           => $author,
+					'categories'       => $this->convert_categories_to_surfer_select( $post->ID ),
+					'tags'             => $this->convert_tags_to_surfer_select( $post->ID ),
+					'meta_title'       => $this->get_post_meta_title( $post->ID ),
+					'meta_description' => $this->get_post_meta_description( $post->ID ),
 				);
 			}
 		}
@@ -724,6 +726,100 @@ class Surfer {
 		}
 
 		return $tags;
+	}
+
+	/**
+	 * Get post meta title.
+	 *
+	 * @param int $post_id - ID of the post.
+	 * @return string
+	 */
+	public function get_post_meta_title( $post_id ) {
+
+		$chosen_seo_plugin = Surfer()->get_surfer_settings()->get_option( 'content-importer', 'default_seo_plugin', '' );
+
+		if ( ! empty( $chosen_seo_plugin ) ) {
+			switch ( $chosen_seo_plugin ) {
+				case 'yoast':
+					return get_post_meta( $post_id, '_yoast_wpseo_title', true );
+				case 'rank_math':
+					return get_post_meta( $post_id, 'rank_math_title', true );
+				case 'aioseo':
+					return get_post_meta( $post_id, '_aioseo_title', true );
+				case 'surfer':
+					return get_post_meta( $post_id, '_surferseo_title', true );
+			}
+		}
+
+		if ( surfer_check_if_plugins_is_active( 'wordpress-seo/wp-seo.php' ) ) {
+			$title = get_post_meta( $post_id, '_yoast_wpseo_title', true );
+			if ( ! empty( $title ) ) {
+				return $title;
+			}
+		}
+
+		if ( surfer_check_if_plugins_is_active( 'rank-math/rank-math.php' ) ) {
+			$title = get_post_meta( $post_id, 'rank_math_title', true );
+			if ( ! empty( $title ) ) {
+				return $title;
+			}
+		}
+
+		if ( surfer_check_if_plugins_is_active( 'all-in-one-seo-pack/all_in_one_seo_pack.php' ) ) {
+			$title = get_post_meta( $post_id, '_aioseo_title', true );
+			if ( ! empty( $title ) ) {
+				return $title;
+			}
+		}
+
+		return '';
+	}
+
+	/**
+	 * Get post meta description.
+	 *
+	 * @param int $post_id - ID of the post.
+	 * @return string
+	 */
+	public function get_post_meta_description( $post_id ) {
+
+		$chosen_seo_plugin = Surfer()->get_surfer_settings()->get_option( 'content-importer', 'default_seo_plugin', '' );
+
+		if ( ! empty( $chosen_seo_plugin ) ) {
+			switch ( $chosen_seo_plugin ) {
+				case 'yoast':
+					return get_post_meta( $post_id, '_yoast_wpseo_metadesc', true );
+				case 'rank_math':
+					return get_post_meta( $post_id, 'rank_math_description', true );
+				case 'aioseo':
+					return get_post_meta( $post_id, '_aioseo_description', true );
+				case 'surfer':
+					return get_post_meta( $post_id, '_surferseo_description', true );
+			}
+		}
+
+		if ( surfer_check_if_plugins_is_active( 'wordpress-seo/wp-seo.php' ) ) {
+			$description = get_post_meta( $post_id, '_yoast_wpseo_metadesc', true );
+			if ( ! empty( $description ) ) {
+				return $description;
+			}
+		}
+
+		if ( surfer_check_if_plugins_is_active( 'rank-math/rank-math.php' ) ) {
+			$description = get_post_meta( $post_id, 'rank_math_description', true );
+			if ( ! empty( $description ) ) {
+				return $description;
+			}
+		}
+
+		if ( surfer_check_if_plugins_is_active( 'all-in-one-seo-pack/all_in_one_seo_pack.php' ) ) {
+			$description = get_post_meta( $post_id, '_aioseo_description', true );
+			if ( ! empty( $description ) ) {
+				return $description;
+			}
+		}
+
+		return '';
 	}
 
 	/**
@@ -1097,7 +1193,7 @@ class Surfer {
 				'ajaxurl'                => admin_url( 'admin-ajax.php' ),
 				'wp_admin_url'           => admin_url( 'index.php' ),
 				'baseurl'                => Surfer()->get_baseurl(),
-				// Surfer genral usage.
+				// Surfer general usage.
 				'wp_language'            => strtolower( $this->get_langauge_code() ),
 				'learnmore_url'          => 'https://docs.surferseo.com/en/collections/3548643-wpsurfer',
 				'config_url'             => admin_url( 'admin.php?page=surfer#header_core' ),
@@ -1118,6 +1214,8 @@ class Surfer {
 				'default_post_location'  => get_post_meta( get_the_ID(), 'surfer_location', true ),
 				// Security.
 				'surfer_ajax_nonce'      => wp_create_nonce( 'surfer-ajax-nonce' ),
+				// Integrations.
+				'disable_elementor'      => Surfer()->get_surfer_settings()->get_option( 'content-importer', 'disable_elementor', false ),
 			)
 		);
 	}

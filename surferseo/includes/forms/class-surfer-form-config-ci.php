@@ -121,6 +121,17 @@ class Surfer_Form_Config_Ci extends Surfer_Form {
 		$field->set_row_classes( 'surfer-connected' );
 		$this->add_field( $field );
 
+		$field = new Surfer_Form_Element_Select( 'default_seo_plugin' );
+		$field->set_label( __( 'Default SEO Plugin', 'surferseo' ) );
+		$field->set_hint( __( 'SEO plugin that you are using for meta tags.', 'surferseo' ) );
+		$field->add_option( '', __( 'Auto Detection (Default)', 'surferseo' ) );
+		$field->add_option( 'aioseo', __( 'All in One SEO', 'surferseo' ) );
+		$field->add_option( 'rank_math', __( 'Rank Math', 'surferseo' ) );
+		// $field->add_option( 'surfer', __( 'Surfer Plugin build-in', 'surferseo' ) );
+		$field->add_option( 'yoast', __( 'Yoast SEO', 'surferseo' ) );
+		$field->set_row_classes( 'surfer-connected' );
+		$this->add_field( $field );
+
 		$all_users = get_users( array( 'number' => -1 ) );
 
 		$field = new Surfer_Form_Element_Select( 'default_post_author' );
@@ -153,13 +164,11 @@ class Surfer_Form_Config_Ci extends Surfer_Form {
 
 		$tags = get_tags( $args );
 
-		$field = new Surfer_Form_Element_Select( 'default_tags' );
-		$field->set_label( __( 'Tag', 'surferseo' ) );
-		$field->add_option( '', __( '- Select an option -', 'surferseo' ) );
+		$field = new Surfer_Form_Element_Checkbox( 'disable_elementor' );
+		$field->set_label( '' );
+		$field->add_option( 1, __( 'Disable Surfer writing guidelines in Elementor editor', 'surferseo' ) );
+		$field->set_renderer( array( $this, 'render_switch' ) );
 		$field->set_row_classes( 'surfer-connected' );
-		foreach ( $tags as $tag ) {
-			$field->add_option( $tag->name, $tag->name );
-		}
 		$this->add_field( $field );
 	}
 
@@ -568,8 +577,8 @@ class Surfer_Form_Config_Ci extends Surfer_Form {
 	 */
 	private function check_if_tracking_or_emails_was_changed() {
 
-		$tracking = isset( $_POST['surfer_tracking_enabled'] ) ? $_POST['surfer_tracking_enabled'] : false;
-		$emails   = isset( $_POST['surfer_position_monitor_summary'] ) ? $_POST['surfer_position_monitor_summary'] : false;
+		$tracking = isset( $_POST['surfer_tracking_enabled'] ) ? wp_unslash( $_POST['surfer_tracking_enabled'] ) : false;
+		$emails   = isset( $_POST['surfer_position_monitor_summary'] ) ? wp_unslash( $_POST['surfer_position_monitor_summary'] ) : false;
 
 		$tracking_current_state = Surfer()->get_surfer_tracking()->is_tracking_allowed();
 		$emails_current_state   = $this->performance_report_email_notification_endabled();

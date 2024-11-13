@@ -84,7 +84,8 @@ class Content_Importer {
 
 		if ( isset( $post ) && 'published' === $post['post_status'] ) {
 			// WordPress set current date as default and we do not want to change publication date.
-			$data['post_date'] = $post['post_date'];
+			$data['post_date']     = $post['post_date'];
+			$data['post_date_gmt'] = $post['post_date_gmt'];
 		} else {
 			$this->resolve_post_date( $args, $data );
 		}
@@ -262,14 +263,18 @@ class Content_Importer {
 	 */
 	private function resolve_post_meta_details( $args, &$data ) {
 
-		$seo_plugin_is_active = false;
+		$chosen_seo_plugin = Surfer()->get_surfer_settings()->get_option( 'content-importer', 'default_seo_plugin', '' );
+
+		if ( '' === $chosen_seo_plugin ) {
+			$chosen_seo_plugin = $this->find_active_seo_plugin();
+		}
 
 		if ( ! isset( $data['meta_input'] ) ) {
 			$data['meta_input'] = array();
 		}
 
 		// Yoast SEO is active.
-		if ( surfer_check_if_plugins_is_active( 'wordpress-seo/wp-seo.php' ) ) {
+		if ( 'yoast' === $chosen_seo_plugin ) {
 
 			if ( isset( $args['meta_title'] ) && '' !== $args['meta_title'] ) {
 				$data['meta_input']['_yoast_wpseo_title'] = $args['meta_title'];
@@ -278,12 +283,10 @@ class Content_Importer {
 			if ( isset( $args['meta_description'] ) && '' !== $args['meta_description'] ) {
 				$data['meta_input']['_yoast_wpseo_metadesc'] = $args['meta_description'];
 			}
-
-			$seo_plugin_is_active = true;
 		}
 
 		// All in One SEO is active.
-		if ( surfer_check_if_plugins_is_active( 'all-in-one-seo-pack/all_in_one_seo_pack.php' ) ) {
+		if ( 'aioseo' === $chosen_seo_plugin ) {
 
 			if ( isset( $args['meta_title'] ) && '' !== $args['meta_title'] ) {
 				$data['meta_input']['_aioseo_title'] = $args['meta_title'];
@@ -292,12 +295,10 @@ class Content_Importer {
 			if ( isset( $args['meta_description'] ) && '' !== $args['meta_description'] ) {
 				$data['meta_input']['_aioseo_description'] = $args['meta_description'];
 			}
-
-			$seo_plugin_is_active = true;
 		}
 
 		// Rank Math SEO.
-		if ( surfer_check_if_plugins_is_active( 'seo-by-rank-math/rank-math.php' ) ) {
+		if ( 'rank_math' === $chosen_seo_plugin ) {
 
 			if ( isset( $args['meta_title'] ) && '' !== $args['meta_title'] ) {
 				$data['meta_input']['rank_math_title'] = $args['meta_title'];
@@ -306,12 +307,10 @@ class Content_Importer {
 			if ( isset( $args['meta_description'] ) && '' !== $args['meta_description'] ) {
 				$data['meta_input']['rank_math_description'] = $args['meta_description'];
 			}
-
-			$seo_plugin_is_active = true;
 		}
 
 		// Save in Surfer Meta to display.
-		if ( ! $seo_plugin_is_active ) {
+		if ( 'surfer' === $chosen_seo_plugin ) {
 
 			if ( isset( $args['meta_title'] ) && '' !== $args['meta_title'] ) {
 				$data['meta_input']['_surferseo_title'] = $args['meta_title'];
@@ -321,6 +320,22 @@ class Content_Importer {
 				$data['meta_input']['_surferseo_description'] = $args['meta_description'];
 			}
 		}
+	}
+
+	/**
+	 * Checks which SEO plugin is active.
+	 */
+	private function find_active_seo_plugin() {
+
+		if ( surfer_check_if_plugins_is_active( 'wordpress-seo/wp-seo.php' ) ) {
+			return 'yoast';
+		} elseif ( surfer_check_if_plugins_is_active( 'all-in-one-seo-pack/all_in_one_seo_pack.php' ) ) {
+			return 'aioseo';
+		} elseif ( surfer_check_if_plugins_is_active( 'seo-by-rank-math/rank-math.php' ) ) {
+			return 'rank_math';
+		}
+
+		return 'surfer';
 	}
 
 

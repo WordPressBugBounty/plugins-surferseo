@@ -237,7 +237,7 @@ class Surfer_Form {
 									<?php echo esc_html( $field->get_label() ); ?>
 								</h3>
 								<?php if ( $field->get_hint() ) : ?>
-									<span class="surfer-admin-config-form__header_description"><?php echo $field->get_hint(); ?></span>
+									<span class="surfer-admin-config-form__header_description"><?php echo wp_kses_post( $field->get_hint() ); ?></span>
 								<?php endif; ?>
 							<?php else : ?>
 
@@ -251,7 +251,7 @@ class Surfer_Form {
 								<div class="surfer_admin_config_form__single_field">
 									<?php $field->render(); ?>
 									<?php if ( $field->get_hint() ) : ?>
-										<br/><small><?php echo $field->get_hint(); ?></small>
+										<br/><small><?php echo wp_kses_post( $field->get_hint() ); ?></small>
 									<?php endif; ?>
 									<?php if ( count( $field->get_errors() ) > 0 ) : ?>
 										<?php foreach ( $field->get_errors() as $error ) : ?>
@@ -405,7 +405,7 @@ class Surfer_Form {
 		if ( self::REPO_OPTIONS === $this->repo ) {
 			$save = $this->save_data_into_options( $tab );
 		} elseif ( self::REPO_DB === $this->repo ) {
-			$save = $this->save_data_into_databse();
+			$save = $this->save_data_into_database();
 		}
 
 		return $save;
@@ -444,7 +444,7 @@ class Surfer_Form {
 	 *
 	 * @return bool
 	 */
-	private function save_data_into_databse() {
+	private function save_data_into_database() {
 		return false;
 	}
 

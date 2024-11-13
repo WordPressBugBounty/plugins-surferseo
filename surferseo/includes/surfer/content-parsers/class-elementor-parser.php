@@ -115,18 +115,20 @@ class Elementor_Parser extends Content_Parser {
 		$elementor_template = Surfer()->get_surfer_settings()->get_option( 'content-importer', 'default_elementor_template', 'default' );
 		if ( $elementor_template > 0 ) {
 			$template_post = get_post( $elementor_template );
-			$template      = json_decode( get_post_meta( $template_post->ID, '_elementor_data', true ) )[0];
+			if ( isset( $template_post ) && $template_post->ID > 0 ) {
+				$template = json_decode( get_post_meta( $template_post->ID, '_elementor_data', true ) )[0];
 
-			if ( isset( $template->elType ) && 'container' === $template->elType ) {  // @codingStandardsIgnoreLine
-				$settings = $template->settings;
-			}
+				if ( isset( $template->elType ) && 'container' === $template->elType ) {  // @codingStandardsIgnoreLine
+					$settings = $template->settings;
+				}
 
-			foreach ( $template->elements as $element ) {
-				if ( isset( $element->elType ) && 'widget' === $element->elType ) {  // @codingStandardsIgnoreLine
-					if ( 'heading' === $element->widgetType ) {  // @codingStandardsIgnoreLine
-						$elementor_styling[ ( $element->settings->header_size ) ? $element->settings->header_size : 'h2' ] = $element->settings; // @codingStandardsIgnoreLine
-					} else {
-						$elementor_styling[ $element->widgetType ] = $element->settings; // @codingStandardsIgnoreLine
+				foreach ( $template->elements as $element ) {
+					if ( isset( $element->elType ) && 'widget' === $element->elType ) {  // @codingStandardsIgnoreLine
+						if ( 'heading' === $element->widgetType ) {  // @codingStandardsIgnoreLine
+							$elementor_styling[ ( $element->settings->header_size ) ? $element->settings->header_size : 'h2' ] = $element->settings; // @codingStandardsIgnoreLine
+						} else {
+							$elementor_styling[ $element->widgetType ] = $element->settings; // @codingStandardsIgnoreLine
+						}
 					}
 				}
 			}

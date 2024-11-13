@@ -10,6 +10,7 @@ namespace SurferSEO\Surfer;
 
 use DOMDocument;
 use PHP_CodeSniffer\Tokenizers\PHP;
+use SurferSEO\Surfer;
 use SurferSEO\Surferseo;
 
 /**
@@ -71,10 +72,12 @@ class Content_Exporter {
 			wp_die();
 		}
 
-		$keywords = isset( $data->keywords ) ? sanitize_text_field( wp_unslash( $data->keywords ) ) : false;
-		$location = isset( $data->location ) ? sanitize_text_field( wp_unslash( $data->location ) ) : 'United States';
-		$content  = isset( $data->content ) ? wp_kses_post( $data->content ) : false;
-		$post_id  = isset( $data->post_id ) ? intval( $data->post_id ) : false;
+		$keywords         = isset( $data->keywords ) ? sanitize_text_field( wp_unslash( $data->keywords ) ) : false;
+		$location         = isset( $data->location ) ? sanitize_text_field( wp_unslash( $data->location ) ) : 'United States';
+		$content          = isset( $data->content ) ? wp_kses_post( $data->content ) : false;
+		$post_id          = isset( $data->post_id ) ? intval( $data->post_id ) : false;
+		$meta_title       = isset( $data->post_id ) ? sanitize_text_field( wp_unslash( Surfer()->get_surfer()->get_post_meta_title( $data->post_id ) ) ) : false;
+		$meta_description = isset( $data->post_id ) ? sanitize_text_field( wp_unslash( Surfer()->get_surfer()->get_post_meta_description( $data->post_id ) ) ) : false;
 
 		if ( false === $keywords || '' === $keywords || empty( $keywords ) ) {
 			echo wp_json_encode( array( 'message' => 'You need to provide at least one keyword.' ) );
@@ -86,11 +89,13 @@ class Content_Exporter {
 		}
 
 		$params = array(
-			'keywords'   => $keywords,
-			'location'   => $location,
-			'content'    => $content,
-			'wp_post_id' => $post_id,
-			'url'        => apply_filters( 'surfer_api_base_url', get_site_url() ),
+			'keywords'         => $keywords,
+			'location'         => $location,
+			'content'          => $content,
+			'wp_post_id'       => $post_id,
+			'url'              => apply_filters( 'surfer_api_base_url', get_site_url() ),
+			'meta_title'       => $meta_title,
+			'meta_description' => $meta_description,
 		);
 
 		list(
@@ -120,18 +125,22 @@ class Content_Exporter {
 
 		$keywords = isset( $data->keywords ) ? $data->keywords : false;
 
-		$content        = isset( $data->content ) ? wp_kses_post( $this->parse_content_for_surfer( $data->content ) ) : false;
-		$draft_id       = isset( $data->draft_id ) ? intval( $data->draft_id ) : false;
-		$post_id        = isset( $data->post_id ) ? intval( $data->post_id ) : false;
-		$permalink_hash = isset( $data->permalink_hash ) ? sanitize_text_field( wp_unslash( $data->permalink_hash ) ) : false;
-		$keywords       = is_array( $data->keywords ) ? array_map( 'sanitize_text_field', $data->keywords ) : sanitize_text_field( wp_unslash( $data->keywords ) );
-		$location       = isset( $data->location ) ? sanitize_text_field( wp_unslash( $data->location ) ) : false;
+		$content          = isset( $data->content ) ? wp_kses_post( $this->parse_content_for_surfer( $data->content ) ) : false;
+		$draft_id         = isset( $data->draft_id ) ? intval( $data->draft_id ) : false;
+		$post_id          = isset( $data->post_id ) ? intval( $data->post_id ) : false;
+		$permalink_hash   = isset( $data->permalink_hash ) ? sanitize_text_field( wp_unslash( $data->permalink_hash ) ) : false;
+		$keywords         = is_array( $data->keywords ) ? array_map( 'sanitize_text_field', $data->keywords ) : sanitize_text_field( wp_unslash( $data->keywords ) );
+		$location         = isset( $data->location ) ? sanitize_text_field( wp_unslash( $data->location ) ) : false;
+		$meta_title       = isset( $data->post_id ) ? sanitize_text_field( wp_unslash( Surfer()->get_surfer()->get_post_meta_title( $data->post_id ) ) ) : false;
+		$meta_description = isset( $data->post_id ) ? sanitize_text_field( wp_unslash( Surfer()->get_surfer()->get_post_meta_description( $data->post_id ) ) ) : false;
 
 		$params = array(
-			'draft_id'   => $draft_id,
-			'content'    => $content,
-			'wp_post_id' => $post_id,
-			'url'        => apply_filters( 'surfer_api_base_url', get_site_url() ),
+			'draft_id'         => $draft_id,
+			'content'          => $content,
+			'wp_post_id'       => $post_id,
+			'url'              => apply_filters( 'surfer_api_base_url', get_site_url() ),
+			'meta_title'       => $meta_title,
+			'meta_description' => $meta_description,
 		);
 
 		list(
@@ -234,7 +243,7 @@ class Content_Exporter {
 	}
 
 	/**
-	 * Function interates by HTML tags in provided content.
+	 * Function iterates by HTML tags in provided content.
 	 *
 	 * @param DOMDocument $parent_node - node to parse.
 	 * @param string      $content     - reference to content variable, to store Gutenberg output.
@@ -463,7 +472,7 @@ class Content_Exporter {
 			wp_die();
 		}
 
-		$posts = isset( $_POST['posts'] ) ? $_POST['posts'] : false;
+		$posts = isset( $_POST['posts'] ) ? wp_unslash( $_POST['posts'] ) : false;
 
 		if ( ! $posts ) {
 			echo wp_json_encode( array( 'message' => 'No posts to reconnect.' ) );

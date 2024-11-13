@@ -88,8 +88,7 @@ class Content_Parser {
 	 */
 	protected function download_img_to_media_library( $image_url, $image_alt = '', $url_only = true ) {
 
-		$file_name = basename( $image_url );
-		$image_id  = $this->find_image_by_name( $file_name );
+		$image_id = $this->find_image_by_url( $image_url );
 		if ( 0 === $image_id ) {
 			$image_id = $this->upload_images_to_wp( $image_url );
 		}
@@ -151,27 +150,30 @@ class Content_Parser {
 
 		$attachment_id = media_handle_sideload( $file_array, 0, null, $post_data );
 		update_post_meta( $attachment_id, 'surfer_file_name', $file_name );
+		update_post_meta( $attachment_id, 'surfer_file_original_url', $image_url );
 		@unlink( $tmp_directory ); // phpcs:ignore
 
 		return $attachment_id;
 	}
 
 	/**
-	 * Search for image by name and return it's URL.
+	 * Search for image by URL and return it's ID.
 	 *
-	 * @param string $file_name - name of the file.
+	 * @param string $image_url - URL to the image.
 	 * @return int
 	 */
-	private function find_image_by_name( $file_name ) {
+	private function find_image_by_url( $image_url ) {
 
 		$image_id = 0;
 
-		$file_name = explode( '.', $file_name );
-		$file_name = $file_name[0];
-
 		$args = array(
 			'post_type'      => 'attachment',
-			'name'           => sanitize_title( $file_name ),
+			'meta_query'     => array(
+				array(
+					'key'   => 'surfer_file_original_url',
+					'value' => $image_url,
+				),
+			),
 			'posts_per_page' => 1,
 			'post_status'    => 'inherit',
 		);

@@ -37,15 +37,6 @@ class Elementor {
 	public function init_hooks() {
 
 		add_action( 'elementor/editor/after_enqueue_styles', array( $this, 'enqueue_scripts_and_styles_in_elementor' ) );
-
-		// We are too late for elementor/init. We should see if we can be on time, or else this workaround works (we do always get the "else" though).
-		/*
-		if ( ! \did_action( 'elementor/init' ) ) {
-		\add_action( 'elementor/init', array( $this, 'add_surfer_panel_tab' ) );
-		} else {
-		$this->add_surfer_panel_tab();
-		}*/
-
 		add_action( 'elementor/documents/register_controls', array( $this, 'register_document_controls' ) );
 	}
 
@@ -141,9 +132,7 @@ class Elementor {
 		$document->add_control(
 			'keyword_research',
 			array(
-				// 'label'        => esc_html__( 'Keywrod Research', 'surferseo' ),
 				'type'      => Controls_Manager::RAW_HTML,
-				// 'return_value' => 'open',
 				'raw'       => $raw_html,
 				'separator' => 'none',
 			)

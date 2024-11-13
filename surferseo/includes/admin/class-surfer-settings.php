@@ -166,10 +166,12 @@ class Surfer_Settings {
 			'default_content_editor'              => Parsers_Controller::AUTOMATIC,
 			'default_page_template'               => 'default',
 			'default_elementor_template'          => '',
+			'default_seo_plugin'                  => '',
 			'default_post_author'                 => $users[0]->ID,
 			'default_post_status'                 => 'draft',
 			'default_category'                    => false,
 			'default_tags'                        => false,
+			'disable_elementor'                   => false,
 			'surfer_gsc_meta_script'              => false,
 			'surfer_gsc_data_collection_interval' => 7,
 		);

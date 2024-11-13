@@ -1,0 +1,21 @@
+{
+  "name": "Surfer",
+  "slug": "surfer",
+  "author": "<a href='https://surferseo.com'>Surfer</a>",
+  "author_profile": "",
+  "version": "1.6.0.523",
+  "download_url": "https://app.surferseo.com/wpsurfer-plugin/wpsurfer-1.6.0.523.zip",
+  "requires": "5.7",
+  "tested": "6.2.2",
+  "requires_php": "7.4",
+  "last_updated": "2024-11-13 14:56",
+  "sections": {
+    "description": "Create content that ranks with Surfer in WordPress ",
+    "installation": "Click the activate button and that's it.",
+    "changelog": "<h4>1.0.0 – 14.07.2022</h4><ul><li>Initital release.</li><li>Export content from Content Editor to WordPress</li></ul><h4>1.0.1 – 22.07.2022</h4><ul><li>Bug fixes</li></ul><h4>1.1.0 – 12.10.2022</h4><ul><li>Bugs fixes</li><li>Keyword Surfer - tool for keyword research</li><li>Option to insert GSC meta tag into head section</li><li>Automatic update</li><li></ul>"
+  },
+  "banners": {
+    "low": "https://app.surferseo.com/wpsurfer-plugin/772x250.png",
+    "high": "https://app.surferseo.com/wpsurfer-plugin/1544x500.png"
+  }
+}

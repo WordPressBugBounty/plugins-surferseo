@@ -33,7 +33,6 @@ class Surfer_General_Endpoints {
 		$this->content_parser = new Parsers_Controller();
 
 		add_action( 'init', array( $this, 'register_request_to_endpoints' ) );
-		// add_action( 'rest_api_init', array( $this, 'register_general_api_endpoints' ) );
 	}
 
 	/**

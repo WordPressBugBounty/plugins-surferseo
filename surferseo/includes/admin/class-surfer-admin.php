@@ -10,6 +10,9 @@ namespace SurferSEO\Admin;
 
 use SurferSEO\Surferseo;
 use SurferSEO\Forms\Surfer_Form_Config_Ci;
+use SurferSEO\Surfer\Content_Parsers\Parsers_Controller;
+use Elementor\Plugin;
+
 
 /**
  * Controller to store admin part of WPSurfer
@@ -28,6 +31,7 @@ class Surfer_Admin {
 		add_action( 'admin_init', array( $this, 'download_debug_data' ) );
 
 		add_action( 'admin_notices', array( $this, 'check_wordfence_application_password_protection' ) );
+		add_action( 'admin_notices', array( $this, 'check_elementor_grid_settings' ) );
 
 		add_action( 'admin_init', array( $this, 'do_admin_redirects' ) );
 		add_action( 'admin_menu', array( $this, 'create_wizard_page' ) );
@@ -248,6 +252,45 @@ class Surfer_Admin {
 	}
 
 	/**
+	 * Check if Elementor Grid Container is enabled.
+	 * Without it, export from Surfer to Elementor may not work properly.
+	 *
+	 * @return void
+	 */
+	public function check_elementor_grid_settings() {
+
+		if ( ! is_plugin_active( 'elementor/elementor.php' ) ) {
+			return;
+		}
+
+		$config_parser = Surfer()->get_surfer_settings()->get_option( 'content-importer', 'default_content_editor', Parsers_Controller::GUTENBERG );
+
+		if ( Parsers_Controller::ELEMENTOR !== $config_parser ) {
+			return;
+		}
+
+		$grid_is_active = Plugin::$instance->experiments->is_feature_active( 'container_grid' );
+
+		if ( $grid_is_active ) {
+			return;
+		}
+
+		$class       = 'notice notice-error';
+		$disable_url = admin_url( 'admin.php?page=elementor-settings#e-experiment-container_grid' );
+
+		/* translators: %s - URL to the option that should be disabled */
+		$message = sprintf( __( '<b>It appears there may be an issue with Elementor</b> <br/>We have noticed that you are attempting to use the Elementor parser with the Surfer plugin while the Grid Container option is disabled. Please be aware that this configuration may lead to errors during the export process from Surfer. <a href="%s">Please enable this option</a>.', 'surferseo' ), $disable_url );
+
+		$allowed_html = array(
+			'b'  => array(),
+			'br' => array(),
+			'a'  => array( 'href' => array() ),
+		);
+
+		printf( '<div class="%1$s"><p>%2$s</p></div>', esc_attr( $class ), wp_kses( $message, $allowed_html ) );
+	}
+
+	/**
 	 * Handle redirects to setup/welcome page after install and updates.
 	 *
 	 * For setup wizard, transient must be present, the user must have access rights, and we must ignore the network/bulk plugin updaters.
@@ -269,8 +312,8 @@ class Surfer_Admin {
 
 			// On these pages, or during these events, disable the redirect.
 			if (
-				( 'surfer' === $current_page && $is_onboarding_path ) ||
-				isset( $_GET['activate-multi'] ) // phpcs:ignore WordPress.Security.NonceVerification
+			( 'surfer' === $current_page && $is_onboarding_path ) ||
+			isset( $_GET['activate-multi'] ) // phpcs:ignore WordPress.Security.NonceVerification
 			) {
 				delete_transient( '_surfer_activation_redirect' );
 				$do_redirect = false;
