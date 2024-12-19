@@ -29,12 +29,13 @@ class Surfer_Admin {
 
 		add_action( 'admin_init', array( $this, 'init_filters' ) );
 		add_action( 'admin_init', array( $this, 'download_debug_data' ) );
+		add_action( 'admin_init', array( $this, 'clear_backup_posts' ) );
 
 		add_action( 'admin_notices', array( $this, 'check_wordfence_application_password_protection' ) );
 		add_action( 'admin_notices', array( $this, 'check_elementor_grid_settings' ) );
 
-		add_action( 'admin_init', array( $this, 'do_admin_redirects' ) );
-		add_action( 'admin_menu', array( $this, 'create_wizard_page' ) );
+		// add_action( 'admin_init', array( $this, 'do_admin_redirects' ) );
+		// add_action( 'admin_menu', array( $this, 'create_wizard_page' ) );
 	}
 
 	/**
@@ -269,9 +270,10 @@ class Surfer_Admin {
 			return;
 		}
 
-		$grid_is_active = Plugin::$instance->experiments->is_feature_active( 'container_grid' );
+		$old_grid_is_active = Plugin::$instance->experiments->is_feature_active( 'container_grid' );
+		$new_grid_is_active = Plugin::$instance->experiments->is_feature_active( 'container' );
 
-		if ( $grid_is_active ) {
+		if ( $old_grid_is_active || $new_grid_is_active ) {
 			return;
 		}
 
@@ -379,6 +381,23 @@ class Surfer_Admin {
 		echo $debug_data; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 
 		exit;
+	}
+
+	/**
+	 * Clear backup posts.
+	 */
+	public function clear_backup_posts() {
+		if ( ! isset( $_GET['page'] ) || 'surfer' !== sanitize_text_field( wp_unslash( $_GET['page'] ) ) ) { // phpcs:ignore WordPress.Security.NonceVerification
+			return;
+		}
+
+		if ( ! isset( $_GET['action'] ) || 'clear_backup_posts' !== sanitize_text_field( wp_unslash( $_GET['action'] ) ) ) { // phpcs:ignore WordPress.Security.NonceVerification
+			return;
+		}
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			return;
+		}
 	}
 
 	/**

@@ -3,8 +3,8 @@ Contributors: surferseo, xingupl, judytafromsurfer
 Tags: seo, keywords, content writing, content, keyword research
 Requires at least: 6.0
 Requires PHP: 7.4
-Tested up to: 6.7.0
-Stable tag: 1.6.0.523
+Tested up to: 6.7.1
+Stable tag: 1.6.1.542
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -87,6 +87,14 @@ It is not a bug, it is a feature. ;)
 4. Select prewritten, drafted, pending, future, and published content  and export it to WordPress with just a few clicks.
 
 == Changelog ==
+
+= 1.6.1 =
+* FEATURE: Developer tool, to remove old Surfer Backups
+* FIX: searching posts in Surfer will be by title only instead of current keyword search
+* FIX: Elementor: images caption is counted to content score
+* FIX: Hide Grid container notification for new Elementor versions.
+* FIX: Set proper target attribute for links
+
 
 = 1.6.0 =
 * FEATURE: Support Meta Tags Import/Export from/to Surfer
@@ -205,117 +213,59 @@ It is not a bug, it is a feature. ;)
 
 == Upgrade Notice == 
 
+= 1.6.1 =
+Improves Elementor integration and better images handling.
+
 = 1.6.0 =
-* FEATURE: Support Meta Tags Import/Export from/to Surfer
-* FEATURE: Configuration option to disable writing guidelines in Elementor
-* FEATURE: Support for files with same name or files with name changed after export from Surfer, during saving images in Media Library
-* FIX: Notification for conflict between Surfer export and Elementor settings
-* FIX: GSC reports e-mails with empty "to"
-* FIX: Security improvements
-* FIX: Typos
+Support for Surfer AI Meta Tags
 
 = 1.5.0 =
-* FEATURE: Elementor integration 
-* FIX: REST API authorization issue when redirection is set
-* FIX: Writing Guidelines stuck on first load in Classic Editor
-* FIX: Parsing special chars in headings during import
-* FIX: Missing content issue during export of certain types of images
-* FIX: Better support for custom post types in Classic Editor
+Elementor Integration
 
 = 1.4.3 =
-* FEATURE: Improvements in Elementor integration (beta)
-* FEATURE: Automatic post reconnection (debugging tool)
-* FIX: On export from Surfer, not all post types were visible on list.
-* FIX: On export from WordPress from posts list content sometimes was distorted
+Fixing post types during import and export.
 
 = 1.4.2 =
-* FEATURE: Content Score details in writing guidelines
-* FEATURE: Support for advanced export from Surfer
-* FEATURE: Help button in sidebar
-* Fix: Speed improvements in Gutenberg and Classic Editor
-* Fix: Issues with import to Gutenberg
-* Fix: Upgraded dependencies versions
-* Fix: Code optimization
-* Fix: Better support for React 16 (old WordPress versions)
+Improves Writing Guidelines
 
 = 1.4.1 =
-* Fix: Terms filtering
-* Fix: Writing guidelines reloading on sidebar change
-* Fix: Issue with disconnection
-* Fix: Typos & copy
-* Fix: Styling and design issues
-* Fix: Other small fixes
+Adds custom filters 
 
 = 1.4.0 =
-* FEATURE: Surfer writing guidelines Sidebar introduced
-* FEATURE: Elementor integration (Beta)
+Surfer writing guidelines inside your WordPress (Gutenberg and Classic Editor)
 
 = 1.3.4 =
-* Fix: Classic editor title issue
-* Fix: CRON execution issue
+Fixes Classic Editor issues.
 
 = 1.3.3 =
-* FEATURE: Option to force choose parser from config
-* Fix: Security update
-* Fix: Updated CRON tasks
-* Fix: Better versioning for JS files (no more caching conflicts)
-* Fix: Resolve notices
-* Fix: Missing images on export to Surfer from Classic Editor 
-* Fix: Better error handling for no credits error
+Improves security.
 
 = 1.3.2 =
-* Fix: Migration error
-* Fix: Drop monitor sorting issue
+Better sorting for position drop monitor.
 
 = 1.3.1 =
-* FEATURE: Better handling for images saves
-* Fix: Downloading data from GSC 
-* Fix: Optimization
+Improves images handling.
 
 = 1.3.0 =
-* FEATURE: Position drop monitor - now you will know how your posts perform directly in WordPress!
-* FEATURE: Position drop notifications - We will inform you (if you want) about posts position drop via e-mail or WordPress notification. 
-* Fix: Duplicate H1 issue
-* Fix: Pasting keyword to Content Editor creation
-* Fix: JS conflict with some block plugins in Gutenberg
-* Fix: Missing title in Classic Editor export
-* Fix: Missing content in Classic Editor on late load
-* Fix: Submission of Content Editor creation edge cases
-* Fix: Optimization of plugin size
-* Fix: GSC access capabilities
+Position drop monitor - now you will know how your posts perform directly in WordPress!
 
 = 1.2.2 =
-* Fix: Timeout error for large posts
-* Fix: Posts exported from Surfer will be connected 
+Fix for large posts.
 
 = 1.2.1 =
-* Fix: Better JS file loading
-* Fix: Notices
+Speed improvements.
 
 = 1.2.0 =
-* FEATURE: We eliminated the 30 day limit for blog posts. Access all of your WordPress articles in Surfer's Content Editor.
-* FEATURE: You can now create a new Content Editor directly from WordPress. Use it to create new posts and then update them with one click from the WordPress dashboard.
-* FEATURE: You can now see the clicks and impressions that your posts gathered in the last 30 days. To unlock it, connect Google Search Console to your Surfer account.
-* FEATURE: We added (optional) tracking which will allow us to better understand how users interact with the plugin and how to prioritize incoming improvements. 
-* Fix: Fixes on commonly know bugs
+You can create Content Editor inside Surfer from WordPress.
 
 = 1.1.2 = 
-* FEATURE: new hook for post types
-* Fix: Fixes on commonly know bugs
+New custom hooks.
 
 = 1.1.1 = 
-* FEATURE: Support for headless WordPress
-* Fix: Increase import script execution time to solve timeouts (can have no effect, based on server config)
-* Fix: CSS optimization
-* Fix: Better images parsing for Classic Editor
-* Fix: Accessibility improvements
-* Fix: Other minor fixes
+Support for headless WordPress.
 
 = 1.1.0 =
-* FEATURE: Keyword Research tool
-* FEATURE: Add GSC tag into header section
-* Fix: Bug fixes
+Keyword Research.
 
 = 1.0.0 =
-* FEATURE: Initial release.
-* FEATURE: Export content from Surfer Content Editor to WordPress.
+Export content to Surfer!

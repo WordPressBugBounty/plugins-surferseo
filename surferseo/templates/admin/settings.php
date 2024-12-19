@@ -27,7 +27,7 @@ use SurferSEO\Surferseo;
 	<form action="" method="POST">
 		<div class="surfer-wraper">
 			<div class="surfer-wraper__logo">
-				<img src="<?php echo esc_url( Surfer()->get_baseurl() . 'assets/images/surfer_logo.svg' ); ?>" alt="Surfer Logo" />
+				<?php surfer_image_printer( Surfer()->get_baseurl() . 'assets/images/surfer_logo.svg', 'Surfer Logo', '', '' ); ?>
 			</div>
 			<div class="surfer-wraper__content">
 

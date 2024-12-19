@@ -33,6 +33,7 @@ class Gutenberg_Parser extends Content_Parser {
 		$utf8_fix_suffix = '</body></html>';
 
 		$doc->loadHTML( $utf8_fix_prefix . $content . $utf8_fix_suffix, LIBXML_HTML_NODEFDTD | LIBXML_SCHEMA_CREATE );
+		$doc = $this->handle_links_target_attribute( $doc );
 
 		$parsed_content = '';
 

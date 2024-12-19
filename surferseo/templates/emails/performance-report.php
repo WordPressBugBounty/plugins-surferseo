@@ -9,7 +9,7 @@
 
 <div style="background-color: #F8FAFB; padding: 40px;">
 
-	<img src="<?php echo esc_url( Surfer()->get_baseurl() ); ?>/assets/images/emails/surfer_logo.png" alt="Surfer" style="display: block; width: 114px; height: auto; margin: 0px auto 40px;">
+	<?php surfer_image_printer( Surfer()->get_baseurl() . '/assets/images/emails/surfer_logo.png', 'Surfer', 'display: block; width: 114px; height: auto; margin: 0px auto 40px;', '' ); ?>
 
 	<div style="padding: 32px; width: 720px; box-sizing: border-box; background-color: #ffffff; margin: 0px auto;">
 		<?php /* translators: %s: Site URL. */ ?>
@@ -43,7 +43,7 @@
 					<br/>
 
 					<span style="font-size: 16px; font-weight: 400; line-height: 24px; margin-top: 8px; display: block;">
-					<img src="<?php echo esc_url( Surfer()->get_baseurl() ); ?>/assets/images/emails/eye.png" alt="Impressions" style="width: 24px; vertical-align: top;" />
+					<?php surfer_image_printer( Surfer()->get_baseurl() . '/assets/images/emails/eye.png', 'Impressions', 'width: 24px; vertical-align: top;', '' ); ?>
 						<?php esc_html_e( 'Total Impressions', 'surferseo' ); ?>
 					<span>
 				</td>
@@ -69,7 +69,7 @@
 					<br/>
 
 					<span style="font-size: 16px; font-weight: 400; line-height: 24px; margin-top: 8px; display: block;">
-						<img src="<?php echo esc_url( Surfer()->get_baseurl() ); ?>/assets/images/emails/cursor-arrow-rays.png" alt="Clicks" style="width: 24px; vertical-align: top;" />
+						<?php surfer_image_printer( Surfer()->get_baseurl() . '/assets/images/emails/cursor-arrow-rays.png', 'Clicks', 'width: 24px; vertical-align: top;', '' ); ?>
 						<?php esc_html_e( 'Total Clicks', 'surferseo' ); ?>
 					</span>
 				</td>

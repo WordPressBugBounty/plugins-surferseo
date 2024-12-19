@@ -26,6 +26,8 @@ class Classic_Editor_Parser extends Content_Parser {
 
 		parent::parse_content( $content );
 
+		$content = wp_unslash( $content );
+
 		$content = $this->parse_img_for_classic_editor( $content );
 		return $content;
 	}
@@ -39,30 +41,33 @@ class Classic_Editor_Parser extends Content_Parser {
 	private function parse_img_for_classic_editor( $content ) {
 
 		$doc = new DOMDocument();
-		$doc->loadHTML( $content );
+
+		$utf8_fix_prefix = '<html><head><meta http-equiv="content-type" content="text/html; charset=utf-8" /></head><body>';
+		$utf8_fix_suffix = '</body></html>';
+
+		$doc->loadHTML( $utf8_fix_prefix . $content . $utf8_fix_suffix, LIBXML_HTML_NODEFDTD | LIBXML_SCHEMA_CREATE );
+
+		$images = $doc->getElementsByTagName( 'img' );
+
+		foreach ( $images as $image ) {
+			$image_url = $image->getAttribute( 'src' );
+			$image_alt = $image->getAttribute( 'alt' );
+
+			$media_library_image_url = $this->download_img_to_media_library( $image_url, $image_alt );
+			$image->setAttribute( 'src', $media_library_image_url );
+		}
+
+		$doc = $this->handle_links_target_attribute( $doc );
 
 		$h1s = $doc->getElementsByTagName( 'h1' );
 
 		foreach ( $h1s as $h1 ) {
-			$h1_text = $this->get_inner_html( $h1 );
-			if ( wp_strip_all_tags( $h1_text ) === $this->title ) {
-				// @codingStandardsIgnoreLine
-				$h1_string = $h1->ownerDocument->saveXML( $h1 );
-				$content   = str_replace( $h1_string, '', $content );
-			}
+			$h1 = $h1s->item( 0 );
+			$h1->parentNode->removeChild( $h1 );
 		}
 
-		$tags = $doc->getElementsByTagName( 'img' );
+		$parsed_content = $doc->saveHTML();
 
-		foreach ( $tags as $tag ) {
-			$image_url = $tag->getAttribute( 'src' );
-			$image_alt = $tag->getAttribute( 'alt' );
-
-			$media_library_image_url = $this->download_img_to_media_library( $image_url, $image_alt );
-
-			$content = str_replace( $image_url, $media_library_image_url, $content );
-		}
-
-		return $content;
+		return $parsed_content;
 	}
 }

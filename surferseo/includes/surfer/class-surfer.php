@@ -628,13 +628,17 @@ class Surfer {
 		);
 
 		if ( $posts_keyword ) {
-			$query_args['s'] = $posts_keyword;
+			$query_args['search_title'] = $posts_keyword;
 		}
 
-		$all_posts = get_posts( $query_args );
+		add_filter( 'posts_where', array( $this, 'search_by_post_title' ), 10, 2 );
+		$query = new \WP_Query( $query_args );
+		remove_filter( 'posts_where', array( $this, 'search_by_post_title' ), 10, 2 );
 
-		if ( $all_posts ) {
-			foreach ( $all_posts as $post ) {
+		if ( $query->have_posts() ) {
+			while ( $query->have_posts() ) {
+				$query->the_post();
+				$post = get_post();
 				$user = get_user_by( 'ID', $post->post_author );
 
 				$author = array(
@@ -682,6 +686,24 @@ class Surfer {
 		);
 
 		return $result;
+	}
+
+	/**
+	 * Search by post title.
+	 * This function is used in WP_Query.
+	 *
+	 * @param string $where - where clause.
+	 * @param object $wp_query - WP_Query object.
+	 * @return string
+	 */
+	public function search_by_post_title( $where, &$wp_query ) {
+		global $wpdb;
+
+		$search_term = $wp_query->get( 'search_title' );
+		if ( $search_term ) {
+			$where .= ' AND ' . $wpdb->posts . '.post_title LIKE \'%' . esc_sql( $wpdb->esc_like( $search_term ) ) . '%\'';
+		}
+		return $where;
 	}
 
 	/**
@@ -738,7 +760,7 @@ class Surfer {
 
 		$chosen_seo_plugin = Surfer()->get_surfer_settings()->get_option( 'content-importer', 'default_seo_plugin', '' );
 
-		if ( ! empty( $chosen_seo_plugin ) ) {
+		if ( '' !== $chosen_seo_plugin ) {
 			switch ( $chosen_seo_plugin ) {
 				case 'yoast':
 					return get_post_meta( $post_id, '_yoast_wpseo_title', true );
@@ -758,7 +780,7 @@ class Surfer {
 			}
 		}
 
-		if ( surfer_check_if_plugins_is_active( 'rank-math/rank-math.php' ) ) {
+		if ( surfer_check_if_plugins_is_active( 'seo-by-rank-math/rank-math.php' ) ) {
 			$title = get_post_meta( $post_id, 'rank_math_title', true );
 			if ( ! empty( $title ) ) {
 				return $title;
@@ -805,7 +827,7 @@ class Surfer {
 			}
 		}
 
-		if ( surfer_check_if_plugins_is_active( 'rank-math/rank-math.php' ) ) {
+		if ( surfer_check_if_plugins_is_active( 'seo-by-rank-math/rank-math.php' ) ) {
 			$description = get_post_meta( $post_id, 'rank_math_description', true );
 			if ( ! empty( $description ) ) {
 				return $description;

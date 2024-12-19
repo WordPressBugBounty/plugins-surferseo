@@ -42,6 +42,7 @@ class Content_Exporter {
 
 		add_filter( 'wp_ajax_surfer_gather_posts_to_reconnect', array( $this, 'gather_posts_to_reconnect' ) );
 		add_filter( 'wp_ajax_surfer_reconnect_posts_with_drafts', array( $this, 'reconnect_posts_with_drafts' ) );
+		add_action( 'wp_ajax_surfer_remove_old_backups', array( $this, 'surfer_remove_old_backups' ) );
 	}
 
 	/**
@@ -540,5 +541,33 @@ class Content_Exporter {
 		}
 
 		return $drafts;
+	}
+
+	/**
+	 * Removes old backups.
+	 */
+	public function surfer_remove_old_backups() {
+
+		if ( ! surfer_validate_ajax_request() ) {
+			echo wp_json_encode( array( 'message' => 'Security check failed.' ) );
+			wp_die();
+		}
+
+		$posts = get_posts(
+			array(
+				'post_type'   => 'post',
+				'post_status' => array( 'surfer-backup' ),
+				'numberposts' => -1,
+			)
+		);
+
+		foreach ( $posts as $post ) {
+			wp_delete_post( $post->ID, true );
+		}
+
+		$response = count( $posts ) . ' of old backups removed.';
+
+		echo wp_json_encode( $response );
+		wp_die();
 	}
 }

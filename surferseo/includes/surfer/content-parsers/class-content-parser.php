@@ -242,4 +242,32 @@ class Content_Parser {
 
 		return $inner_html;
 	}
+
+	/**
+	 * Handles target attribute for links.
+	 * If link is internal, removes target attribute.
+	 * If link is external, adds target="_blank" attribute.
+	 *
+	 * @param DOMDocument $doc - DOMDocument object.
+	 * @return DOMDocument
+	 */
+	protected function handle_links_target_attribute( $doc ) {
+
+		$links = $doc->getElementsByTagName( 'a' );
+
+		foreach ( $links as $link ) {
+			$link_url = $link->getAttribute( 'href' );
+
+			if ( false !== strpos( $link_url, rtrim( get_home_url(), '/' ) ) ) {
+				$link->removeAttribute( 'target' );
+			}
+
+			if ( false === strpos( $link_url, rtrim( get_home_url(), '/' ) ) ) {
+				$link->removeAttribute( 'target' );
+				$link->setAttribute( 'target', '_blank' );
+			}
+		}
+
+		return $doc;
+	}
 }

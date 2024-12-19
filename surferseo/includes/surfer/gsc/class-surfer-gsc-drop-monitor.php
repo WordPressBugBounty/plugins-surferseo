@@ -328,8 +328,8 @@ class Surfer_GSC_Drop_Monitor {
 
 		echo $message; //@PHPCS:ignore:WordPress.Security.EscapeOutput.OutputNotEscaped
 
-		if ( isset( $_GET['send_email'] ) && is_email( $_GET['send_email'] ) ) {
-			wp_mail( $_GET['send_email'], $title, $message, $headers );
+		if ( isset( $_GET['send_email'] ) && is_email( sanitize_email( wp_unslash( $_GET['send_email'] ) ) ) ) {
+			wp_mail( sanitize_email( wp_unslash( $_GET['send_email'] ) ), $title, $message, $headers );
 		}
 
 		wp_die();

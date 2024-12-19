@@ -295,8 +295,14 @@ class Surfer_Form_Config_Ci extends Surfer_Form {
 
 			$field = new Surfer_Form_Element_Text( 'surfer_transfer_gsc_data_to_new_format' );
 			$field->set_label( __( 'Transfer GSC data to new format', 'surferseo' ) );
-			$field->set_hint( __( 'On click data from GSC will be transfered to new format.', 'surferseo' ) );
+			$field->set_hint( __( 'On click data from GSC will be transferred to new format.', 'surferseo' ) );
 			$field->set_renderer( array( $this, 'render_gsc_transfer' ) );
+			$this->add_field( $field );
+
+			$field = new Surfer_Form_Element_Text( 'surfer_remove_old_surfer_backups' );
+			$field->set_label( __( 'Remove old Surfer backups', 'surferseo' ) );
+			$field->set_hint( __( 'On click old Surfer backups (created on post import) will be removed.', 'surferseo' ) );
+			$field->set_renderer( array( $this, 'render_clear_backups' ) );
 			$this->add_field( $field );
 		}
 	}
@@ -350,7 +356,7 @@ class Surfer_Form_Config_Ci extends Surfer_Form {
 						<p class="surfer-connection-box__actions">
 							<button class="surfer-button surfer-button--secondary surfer-button--xsmall" id="surfer_disconnect"><?php esc_html_e( 'Disconnect', 'surferseo' ); ?></button> 
 							<button id="surfer_reconnect" class="surfer-button surfer-button--secondary surfer-button--xsmall"><?php esc_html_e( 'Replace with another Surfer account', 'surferseo' ); ?></button>
-							<img src="<?php echo esc_html( includes_url() ); ?>images/spinner.gif" alt="spinner" style="display: none" id="surfer-reconnection-spinner" />
+							<?php surfer_image_printer( esc_url( includes_url() ) . 'images/spinner.gif', 'spinner', 'display: none', 'surfer-reconnection-spinner' ); ?>
 						</p>
 					</div>
 				</div>
@@ -368,7 +374,7 @@ class Surfer_Form_Config_Ci extends Surfer_Form {
 								</svg>
 								<?php esc_html_e( 'Log in and integrate with Surfer', 'surferseo' ); ?>
 							</button>
-							<img src="<?php echo esc_html( includes_url() ); ?>images/spinner.gif" alt="spinner" style="display: none" id="surfer-connection-spinner" />
+							<?php surfer_image_printer( esc_url( includes_url() ) . 'images/spinner.gif', 'spinner', 'display: none', 'surfer-connection-spinner' ); ?>
 						</p>
 					</div>
 				</div>
@@ -544,6 +550,31 @@ class Surfer_Form_Config_Ci extends Surfer_Form {
 	}
 
 	/**
+	 * Renders button to clear backups.
+	 *
+	 * @param Surfer_Form_Element $field - field object.
+	 */
+	public function render_clear_backups( $field ) {
+
+		ob_start();
+		?>
+
+			<div class="surfer-remove-surfer-backups-box <?php echo esc_html( $field->get_classes() ); ?>">
+				<p><?php echo wp_kses_post( $field->get_hint() ); ?></p>
+
+				<button class="surfer-button surfer-button--secondary surfer-button--small surfer-remove-surfer-backups-box__button">
+					<?php esc_html_e( 'Remove Surfer Backups', 'surferseo' ); ?>
+				</button>
+
+				<div class="surfer-remove-surfer-backups-box__result"></div>
+			</div>
+		<?php
+		$html = ob_get_clean();
+
+		echo wp_kses_post( $html );
+	}
+
+	/**
 	 * Overrides parent save method to add tracking.
 	 *
 	 * @param bool | string $tab - tab name.
@@ -553,7 +584,7 @@ class Surfer_Form_Config_Ci extends Surfer_Form {
 
 		$tracking_enabled = Surfer()->get_surfer_tracking()->is_tracking_allowed();
 
-		if ( $tracking_enabled || 1 === intval( $_POST['surfer_tracking_enabled'] ) ) {
+		if ( $tracking_enabled || ( isset( $_POST['surfer_tracking_enabled'] ) && 1 === intval( $_POST['surfer_tracking_enabled'] ) ) ) {
 			$data = $this->check_if_tracking_or_emails_was_changed();
 			Surfer()->get_surfer_tracking()->track_wp_event( 'config_saved', wp_json_encode( $data ) );
 		}

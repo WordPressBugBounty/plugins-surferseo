@@ -150,4 +150,27 @@ jQuery(function ($) {
       reconnect_posts_with_drafts()
     }
   )
+
+  function remove_old_surfer_backups() {
+    var data = {
+      action: 'surfer_remove_old_backups',
+      _surfer_nonce: surfer_lang._surfer_nonce,
+    }
+
+    $.ajax({
+      url: surfer_lang.ajaxurl,
+      type: 'POST',
+      data: data,
+      dataType: 'json',
+      async: true,
+      success: function (response) {
+        $('.surfer-remove-surfer-backups-box__result').text(response)
+      },
+    })
+  }
+
+  $('.surfer-remove-surfer-backups-box__button').on('click', function (event) {
+    event.preventDefault()
+    remove_old_surfer_backups()
+  })
 })

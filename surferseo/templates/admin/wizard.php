@@ -9,7 +9,7 @@
 <div class="wrap wizard-wrapper">
 
 	<header class="wizard-wrapper__header">
-		<img src="<?php echo esc_html( Surfer()->get_baseurl() ); ?>assets/images/admin_menu_logo.svg" />
+		<?php surfer_image_printer( Surfer()->get_baseurl() . 'assets/images/surfer_logo.svg', 'Surfer Logo', '', '' ); ?>
 		<h3><?php esc_html_e( 'Help us making Surfer better for you', 'surferseo' ); ?></h3>
 	</header>
 

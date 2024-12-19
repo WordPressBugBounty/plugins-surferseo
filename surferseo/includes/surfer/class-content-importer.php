@@ -91,6 +91,7 @@ class Content_Importer {
 		}
 
 		$post_id = wp_insert_post( $data, true );
+		$this->update_aioseo_table( $data['meta_input']['_aioseo_title'], $data['meta_input']['_aioseo_description'], $post_id );
 
 		if ( ! is_wp_error( $post_id ) && isset( $args['draft_id'] ) ) {
 			update_post_meta( $post_id, 'surfer_draft_id', $args['draft_id'] );
@@ -410,5 +411,54 @@ class Content_Importer {
 
 		echo wp_json_encode( $response );
 		wp_die();
+	}
+
+	/**
+	 * Update All in One SEO table with new values.
+	 *
+	 * @param string $meta_title - title to update.
+	 * @param string $meta_description - description to update.
+	 * @param int    $post_id - post ID.
+	 */
+	private function update_aioseo_table( $meta_title, $meta_description, $post_id ) {
+
+		$chosen_seo_plugin = Surfer()->get_surfer_settings()->get_option( 'content-importer', 'default_seo_plugin', '' );
+
+		if ( '' === $chosen_seo_plugin ) {
+			$chosen_seo_plugin = $this->find_active_seo_plugin();
+		}
+
+		if ( 'aioseo' != $chosen_seo_plugin ) {
+			return;
+		}
+
+		global $wpdb;
+
+		$table = $wpdb->prefix . 'aioseo_posts';
+
+		$have_field = $wpdb->query( $wpdb->prepare( 'SELECT * FROM %s WHERE post_id = %d', $table, $post_id ) );
+
+		if ( $have_field ) {
+			$wpdb->update(
+				$table,
+				array(
+					'title'       => $meta_title,
+					'description' => $meta_description,
+				),
+				array( 'post_id' => $post_id ),
+				array( '%s', '%s' ),
+				array( '%d' )
+			);
+		} else {
+			$wpdb->insert(
+				$table,
+				array(
+					'post_id'     => $post_id,
+					'title'       => $meta_title,
+					'description' => $meta_description,
+				),
+				array( '%d', '%s', '%s' )
+			);
+		}
 	}
 }
