@@ -25,11 +25,11 @@ use SurferSEO\Surferseo;
 	<?php endif; ?>
 
 	<form action="" method="POST">
-		<div class="surfer-wraper">
-			<div class="surfer-wraper__logo">
+		<div class="surfer-wrapper">
+			<div class="surfer-wrapper__logo">
 				<?php surfer_image_printer( Surfer()->get_baseurl() . 'assets/images/surfer_logo.svg', 'Surfer Logo', '', '' ); ?>
 			</div>
-			<div class="surfer-wraper__content">
+			<div class="surfer-wrapper__content">
 
 				<?php wp_nonce_field( 'surfer_settings_save', '_surfer_nonce' ); ?>
 

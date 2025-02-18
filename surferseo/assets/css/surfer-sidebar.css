@@ -1,1 +1,10 @@
-#surfer-guidelines-container,#surfer-guidelines-container iframe{max-width:100%}.surfer-picker input[type=radio]:before{background-color:transparent}
+#surfer-guidelines-container {
+  max-width: 100%;
+}
+#surfer-guidelines-container iframe {
+  max-width: 100%;
+}
+
+.surfer-picker input[type=radio]::before {
+  background-color: transparent;
+}

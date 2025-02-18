@@ -255,16 +255,31 @@ class Content_Parser {
 
 		$links = $doc->getElementsByTagName( 'a' );
 
+		$internal_links_rel    = Surfer()->get_surfer_settings()->get_option( 'content-importer', 'internal_links_rel', false );
+		$internal_links_target = Surfer()->get_surfer_settings()->get_option( 'content-importer', 'internal_links_target', '_self' );
+		$external_links_rel    = Surfer()->get_surfer_settings()->get_option( 'content-importer', 'external_links_rel', false );
+		$external_links_target = Surfer()->get_surfer_settings()->get_option( 'content-importer', 'external_links_target', '_blank' );
+
 		foreach ( $links as $link ) {
 			$link_url = $link->getAttribute( 'href' );
 
+			$link->removeAttribute( 'target' );
 			if ( false !== strpos( $link_url, rtrim( get_home_url(), '/' ) ) ) {
-				$link->removeAttribute( 'target' );
+				$link->setAttribute( 'target', $internal_links_target );
+
+				if ( $internal_links_rel ) {
+					$link->removeAttribute( 'rel' );
+					$link->setAttribute( 'rel', join( ' ', $internal_links_rel ) );
+				}
 			}
 
 			if ( false === strpos( $link_url, rtrim( get_home_url(), '/' ) ) ) {
-				$link->removeAttribute( 'target' );
-				$link->setAttribute( 'target', '_blank' );
+				$link->setAttribute( 'target', $external_links_target );
+
+				if ( $external_links_rel ) {
+					$link->removeAttribute( 'rel' );
+					$link->setAttribute( 'rel', join( ' ', $external_links_rel ) );
+				}
 			}
 		}
 

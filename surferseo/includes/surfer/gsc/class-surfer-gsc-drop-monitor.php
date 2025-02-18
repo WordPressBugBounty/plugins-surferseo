@@ -38,7 +38,7 @@ class Surfer_GSC_Drop_Monitor {
 	public function init() {
 
 		add_action( 'surfer_gather_drop_monitor_data', array( $this, 'gather_position_monitor_data' ) );
-		add_action( 'surfer_gather_position_monitor_data_bunch', array( $this, 'parse_data_bunch_for_postion_monitor' ) );
+		add_action( 'surfer_gather_position_monitor_data_bunch', array( $this, 'parse_data_bunch_for_position_monitor' ) );
 
 		if ( ! wp_next_scheduled( 'surfer_gather_drop_monitor_data' ) ) {
 			wp_schedule_single_event( strtotime( 'next monday 08:00:00' ), 'surfer_gather_drop_monitor_data' );
@@ -56,7 +56,7 @@ class Surfer_GSC_Drop_Monitor {
 	/**
 	 * Gather single chunk of data from GSC.
 	 */
-	public function parse_data_bunch_for_postion_monitor() {
+	public function parse_data_bunch_for_position_monitor() {
 
 		// Do not run if not connected to GSC.
 		if ( ! $this->check_if_gsc_connected( true ) ) {
@@ -87,7 +87,7 @@ class Surfer_GSC_Drop_Monitor {
 			delete_transient( 'surfer_gsc_data_collection_posts_done' );
 			delete_transient( 'surfer_gsc_data_collection_posts_max' );
 
-			$this->send_performace_report_email();
+			$this->send_performance_report_email();
 
 			set_transient( 'surfer_gsc_weekly_report_ready', true, DAY_IN_SECONDS );
 			update_option( 'surfer_last_gsc_data_update', gmdate( 'Y-m-d H:i:s', strtotime( 'this week monday ' . gmdate( 'H:i:s' ) ) ) );
@@ -161,7 +161,7 @@ class Surfer_GSC_Drop_Monitor {
 
 		$post_id = url_to_postid( $page['site'] );
 
-		// If URL was not transformend to post ID, skip.
+		// If URL was not transformed to post ID, skip.
 		if ( 0 === intval( $post_id ) ) {
 			return 'Post URL ' . $page['site'] . ' was not transformed to post ID.';
 		}
@@ -180,7 +180,7 @@ class Surfer_GSC_Drop_Monitor {
 		$last_data_gathering = get_option( 'surfer_last_gsc_data_update', strtotime( 'this week monday' ) );
 		$query_last_date     = gmdate( 'Y-m-d 00:00:00', strtotime( $last_data_gathering ) );
 
-		// Skip upddate if last update was this week.
+		// Skip update if last update was this week.
 		if ( false !== $last_post_update && strtotime( $last_post_update ) > strtotime( $query_last_date ) ) {
 			return 'Post with ID: ' . $post_id . ' was already updated in this cycle. (' . $last_post_update . ')';
 		}
@@ -267,10 +267,10 @@ class Surfer_GSC_Drop_Monitor {
 		$return = $this->get_posts_from_gsc( $this->max_gsc_rows, 0 );
 
 		if ( isset( $return['code'] ) && 200 === $return['code'] ) {
-			$numer_of_posts = count( $return['response']['traffic_data'] );
-			set_transient( 'surfer_gsc_data_collection_posts_max', $numer_of_posts, HOUR_IN_SECONDS * 1 );
+			$number_of_posts = count( $return['response']['traffic_data'] );
+			set_transient( 'surfer_gsc_data_collection_posts_max', $number_of_posts, HOUR_IN_SECONDS * 1 );
 
-			$results = $this->parse_data_bunch_for_postion_monitor();
+			$results = $this->parse_data_bunch_for_position_monitor();
 
 			echo wp_json_encode( $results );
 			wp_die();
@@ -284,7 +284,7 @@ class Surfer_GSC_Drop_Monitor {
 	/**
 	 * Sends email with performance report.
 	 */
-	private function send_performace_report_email() {
+	private function send_performance_report_email() {
 
 		if ( ! $this->performance_report_email_notification_endabled() ) {
 			return;
@@ -342,15 +342,15 @@ class Surfer_GSC_Drop_Monitor {
 	 */
 	private function prepare_weekly_report_email_message() {
 
-		$posts_drops_in_top_10              = $this->get_posts_drops_in_top_10();
-		$posts_drops_that_droped_to_next_10 = $this->get_posts_drops_to_next_10();
-		$posts_out_of_index                 = $this->get_posts_out_of_index();
-		$posts_indexed                      = $this->get_indexed_posts();
-		$posts_growth                       = $this->get_posts_that_grew();
+		$posts_drops_in_top_10               = $this->get_posts_drops_in_top_10();
+		$posts_drops_that_dropped_to_next_10 = $this->get_posts_drops_to_next_10();
+		$posts_out_of_index                  = $this->get_posts_out_of_index();
+		$posts_indexed                       = $this->get_indexed_posts();
+		$posts_growth                        = $this->get_posts_that_grew();
 
 		$list_of_posts = array_merge(
 			$posts_drops_in_top_10,
-			$posts_drops_that_droped_to_next_10,
+			$posts_drops_that_dropped_to_next_10,
 			$posts_out_of_index,
 			$posts_indexed,
 			$posts_growth
@@ -393,7 +393,7 @@ class Surfer_GSC_Drop_Monitor {
 
 		global $wpdb;
 
-		// position_change DESC beacust we want biggest fall on top, and fall is represented by positive numbers.
+		// position_change DESC because we want biggest fall on top, and fall is represented by positive numbers.
 		$posts = $wpdb->get_results(
 			$wpdb->prepare(
 				'SELECT * FROM ' . $wpdb->prefix . 'surfer_gsc_traffic AS t
@@ -412,7 +412,7 @@ class Surfer_GSC_Drop_Monitor {
 	}
 
 	/**
-	 * Gets posts that droped to next 10.
+	 * Gets posts that dropped to next 10.
 	 * We count only top 50.
 	 *
 	 * @return array
@@ -429,7 +429,7 @@ class Surfer_GSC_Drop_Monitor {
 
 		global $wpdb;
 
-		// position_change DESC beacust we want biggest fall on top, and fall is represented by positive numbers.
+		// position_change DESC because we want biggest fall on top, and fall is represented by positive numbers.
 		$posts = $wpdb->get_results(
 			$wpdb->prepare(
 				'SELECT * FROM ' . $wpdb->prefix . 'surfer_gsc_traffic AS t
@@ -467,7 +467,7 @@ class Surfer_GSC_Drop_Monitor {
 
 		global $wpdb;
 
-		// Order by position_change ASC - smaller change, means that post was on higher position and they are more important for us. Changes are positive numbers. (POSTION - CHANGE) = 0.
+		// Order by position_change ASC - smaller change, means that post was on higher position and they are more important for us. Changes are positive numbers. (POSITION - CHANGE) = 0.
 		$posts = $wpdb->get_results(
 			$wpdb->prepare(
 				'SELECT * FROM ' . $wpdb->prefix . 'surfer_gsc_traffic AS t
@@ -540,7 +540,7 @@ class Surfer_GSC_Drop_Monitor {
 
 		global $wpdb;
 
-		// position_change ASC beacust we want biggest growth on top, and growth is represented by negative numbers.
+		// position_change ASC because we want biggest growth on top, and growth is represented by negative numbers.
 		$posts = $wpdb->get_results(
 			$wpdb->prepare(
 				'SELECT * FROM ' . $wpdb->prefix . 'surfer_gsc_traffic AS t
@@ -682,6 +682,7 @@ class Surfer_GSC_Drop_Monitor {
 					'postURL'             => get_the_permalink( $result->ID ),
 					'postEditURL'         => get_edit_post_link( $result->ID, 'notdisplay' ),
 					'draftId'             => $result->draft_id,
+					'permalinkHash'       => get_post_meta( $result->ID, 'surfer_permalink_hash', true ),
 					'scrapeStatus'        => get_post_meta( $result->ID, 'surfer_scrape_ready', true ),
 					'postTitle'           => $result->post_title,
 					'position'            => $result->position,

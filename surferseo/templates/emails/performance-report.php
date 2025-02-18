@@ -103,7 +103,7 @@
 			<a href="<?php echo esc_url( admin_url( 'admin.php?page=surfer-performance-report' ) ); ?><?php isset( $tracking_enabled ) && $tracking_enabled ? '&utm_surfer=surfr-email-performance-report-click' : ''; ?>" target="_blank" style="padding: 8px 24px; border-radius: 8px; text-decoration: none; background-color: #222A3A; color: #ffffff; font-size: 16px; font-weight: 600; line-height: 24px; font-family: Helvetica;"><?php esc_html_e( 'View this week’s report', 'surferseo' ); ?></a>
 		</div>
 
-		<?php if ( isset( $posts_drops_in_top_10 ) && isset( $posts_drops_that_droped_to_next_10 ) && isset( $posts_out_of_index ) && count( $posts_drops_in_top_10 ) + count( $posts_drops_that_droped_to_next_10 ) + count( $posts_out_of_index ) > 0 ) : ?>
+		<?php if ( isset( $posts_drops_in_top_10 ) && isset( $posts_drops_that_dropped_to_next_10 ) && isset( $posts_out_of_index ) && count( $posts_drops_in_top_10 ) + count( $posts_drops_that_dropped_to_next_10 ) + count( $posts_out_of_index ) > 0 ) : ?>
 
 		<h2 style="font-size: 20px; font-weight: 600; line-height: 28px; font-family: Helvetica; margin-top: 48px;">
 			<?php esc_html_e( 'Dropped in ranking', 'surferseo' ); ?>
@@ -135,13 +135,13 @@
 			</ul>
 		<?php endif; ?>
 
-		<?php if ( isset( $posts_drops_that_droped_to_next_10 ) && count( $posts_drops_that_droped_to_next_10 ) > 0 ) : ?>
+		<?php if ( isset( $posts_drops_that_dropped_to_next_10 ) && count( $posts_drops_that_dropped_to_next_10 ) > 0 ) : ?>
 			<h3 style="font-size: 16px; font-weight: 600; line-height: 24px; font-family: Helvetica; margin-top: 24px;">
 				<?php esc_html_e( 'Other drops in SERPs', 'surferseo' ); ?>
 			</h3>
 
 			<ul style="list-style: none; padding-left: 0px;">
-				<?php foreach ( $posts_drops_that_droped_to_next_10 as $surfer_i => $surfer_post ) : ?>
+				<?php foreach ( $posts_drops_that_dropped_to_next_10 as $surfer_i => $surfer_post ) : ?>
 					<li style="margin-bottom: 16px;">
 						<span style="font-size: 16px; font-weight: 600; line-height: 24px; font-family: Helvetica; color: #E53E3E;">
 							-<?php echo intval( $surfer_post->position_change ); ?>
@@ -151,7 +151,7 @@
 					<?php if ( $surfer_i >= 4 ) : ?>
 						<li style="margin-bottom: 16px; font-size: 16px; font-weight: 400; line-height: 24px; font-family: Helvetica;">
 							<?php /* translators: %d number of posts. */ ?>
-							<?php printf( esc_html__( '...and %d more', 'surferseo' ), intval( count( $posts_drops_that_droped_to_next_10 ) - 5 ) ); ?>
+							<?php printf( esc_html__( '...and %d more', 'surferseo' ), intval( count( $posts_drops_that_dropped_to_next_10 ) - 5 ) ); ?>
 						</li>
 						<?php break; ?>
 					<?php endif; ?>
@@ -240,7 +240,7 @@
 			</ul>
 		<?php endif; ?>
 
-		<?php if ( isset( $posts_drops_in_top_10 ) && isset( $posts_drops_that_droped_to_next_10 ) && isset( $posts_out_of_index ) && isset( $posts_growth ) && isset( $posts_indexed ) && count( array_merge( $posts_drops_in_top_10, $posts_drops_that_droped_to_next_10, $posts_out_of_index, $posts_growth, $posts_indexed ) ) > 0 ) : ?>
+		<?php if ( isset( $posts_drops_in_top_10 ) && isset( $posts_drops_that_dropped_to_next_10 ) && isset( $posts_out_of_index ) && isset( $posts_growth ) && isset( $posts_indexed ) && count( array_merge( $posts_drops_in_top_10, $posts_drops_that_dropped_to_next_10, $posts_out_of_index, $posts_growth, $posts_indexed ) ) > 0 ) : ?>
 			<p style="width: 100%; padding-top: 48px; margin-top: 48px; text-align: center; border-top: 1px dashed #E2E8F0;">
 				<a href="<?php echo esc_url( admin_url( 'admin.php?page=surfer-performance-report' ) ); ?><?php $tracking_enabled ? '&utm_surfer=surfr-email-disable-click' : ''; ?>" target="_blank" style="padding: 8px 24px; border-radius: 8px; text-decoration: none; background-color: #222A3A; color: #ffffff; font-size: 16px; font-weight: 600; line-height: 24px; font-family: Helvetica;"><?php esc_html_e( 'View this week’s report', 'surferseo' ); ?></a>
 			</p>

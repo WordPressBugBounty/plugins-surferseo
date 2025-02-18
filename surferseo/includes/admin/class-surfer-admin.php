@@ -107,7 +107,7 @@ class Surfer_Admin {
 	/**
 	 * Returns proper form for selected tab.
 	 *
-	 * @param strign $tab - tab that is currenly open.
+	 * @param string $tab - tab that is currently open.
 	 * @return mixed
 	 */
 	private function choose_form_for_tab( $tab ) {
@@ -131,7 +131,7 @@ class Surfer_Admin {
 			'surfer_connection_lang',
 			array(
 				'ajaxurl'           => admin_url( 'admin-ajax.php' ),
-				'popup_block_error' => __( 'Pelease allow popup, to connect with Surfer', 'surferseo' ),
+				'popup_block_error' => __( 'Please allow popup, to connect with Surfer', 'surferseo' ),
 				'_surfer_nonce'     => wp_create_nonce( 'surfer-ajax-nonce' ),
 				'connected'         => $connected,
 			)
@@ -301,7 +301,7 @@ class Surfer_Admin {
 	 */
 	public function do_admin_redirects() {
 
-		// Setup wizard redirect. False, because temporarly we want to disable this.
+		// Setup wizard redirect. False, because temporarily we want to disable this.
 		if ( false && get_transient( '_surfer_activation_redirect' ) ) {
 			$do_redirect        = true;
 			$current_page       = isset( $_GET['page'] ) ? sanitize_text_field( wp_unslash( $_GET['page'] ) ) : false; // phpcs:ignore WordPress.Security.NonceVerification
@@ -401,7 +401,7 @@ class Surfer_Admin {
 	}
 
 	/**
-	 * Prepeare debug data.
+	 * Prepare debug data.
 	 *
 	 * @return string
 	 */

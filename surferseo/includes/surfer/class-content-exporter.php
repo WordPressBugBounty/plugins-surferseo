@@ -228,6 +228,7 @@ class Content_Exporter {
 	private function parse_content_for_surfer( $content ) {
 
 		$content = wp_unslash( $content );
+		$content = do_shortcode( $content );
 
 		$doc = new DOMDocument();
 

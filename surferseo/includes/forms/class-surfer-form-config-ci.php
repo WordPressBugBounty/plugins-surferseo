@@ -26,7 +26,7 @@ class Surfer_Form_Config_Ci extends Surfer_Form {
 	use Surfer_GSC_Common;
 
 	/**
-	 * Construct to initialize form structire.
+	 * Construct to initialize form structure.
 	 *
 	 * @return void
 	 */
@@ -168,6 +168,45 @@ class Surfer_Form_Config_Ci extends Surfer_Form {
 		$field->set_label( '' );
 		$field->add_option( 1, __( 'Disable Surfer writing guidelines in Elementor editor', 'surferseo' ) );
 		$field->set_renderer( array( $this, 'render_switch' ) );
+		$field->set_row_classes( 'surfer-connected' );
+		$this->add_field( $field );
+
+		$field = new Surfer_Form_Element_Checkbox( 'internal_links_rel' );
+		$field->set_label( 'Internal Links Rel' );
+		$field->set_hint( 'Rel arg for internal links after import from Surfer' );
+		$field->add_option( 'noopener', __( 'noopener', 'surferseo' ) );
+		$field->add_option( 'noreferrer', __( 'noreferrer', 'surferseo' ) );
+		$field->add_option( 'nofollow', __( 'nofollow', 'surferseo' ) );
+		$field->add_option( 'dofollow', __( 'dofollow', 'surferseo' ) );
+		$this->add_field( $field );
+
+		$field = new Surfer_Form_Element_Select( 'internal_links_target' );
+		$field->set_label( 'Internal Links Target' );
+		$field->set_hint( 'Target arg for internal links after import from Surfer' );
+		$field->add_option( '_self', __( '_self', 'surferseo' ) );
+		$field->add_option( '_blank', __( '_blank', 'surferseo' ) );
+		$field->add_option( '_parent', __( '_parent', 'surferseo' ) );
+		$field->add_option( '_top', __( '_top', 'surferseo' ) );
+		$this->add_field( $field );
+
+		$field = new Surfer_Form_Element_Checkbox( 'external_links_rel' );
+		$field->set_label( 'External Links Rel' );
+		$field->set_hint( 'Rel arg for external links after import from Surfer' );
+		$field->add_option( 'noopener', __( 'noopener', 'surferseo' ) );
+		$field->add_option( 'noreferrer', __( 'noreferrer', 'surferseo' ) );
+		$field->add_option( 'nofollow', __( 'nofollow', 'surferseo' ) );
+		$field->add_option( 'dofollow', __( 'dofollow', 'surferseo' ) );
+		$this->add_field( $field );
+
+		$field = new Surfer_Form_Element_Select( 'external_links_target' );
+		$field->set_label( 'External Link Target' );
+		$field->set_hint( 'Target arg for external links after import from Surfer' );
+		$field->add_option( '_self', __( '_self', 'surferseo' ) );
+		$field->add_option( '_blank', __( '_blank', 'surferseo' ) );
+		$field->add_option( '_parent', __( '_parent', 'surferseo' ) );
+		$field->add_option( '_top', __( '_top', 'surferseo' ) );
+		$this->add_field( $field );
+
 		$field->set_row_classes( 'surfer-connected' );
 		$this->add_field( $field );
 	}

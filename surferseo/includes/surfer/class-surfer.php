@@ -163,7 +163,7 @@ class Surfer {
 	}
 
 	/**
-	 * Register endpoints in API to make connectio with surfer.
+	 * Register endpoints in API to make connection with surfer.
 	 *
 	 * @return void
 	 */
@@ -359,7 +359,7 @@ class Surfer {
 	 */
 	public function get_surfer_connect_url() {
 		$url   = apply_filters( 'surfer_api_base_url', get_site_url() );
-		$token = $this->genereate_connection_token();
+		$token = $this->generate_connection_token();
 
 		return $this->surfer_url . '/wordpress/connect?token=' . $token . '&url=' . $url;
 	}
@@ -369,7 +369,7 @@ class Surfer {
 	 *
 	 * @return string
 	 */
-	private function genereate_connection_token() {
+	private function generate_connection_token() {
 		$token = wp_generate_uuid4();
 
 		set_transient( 'surfer_connection_token', $token, 60 * 5 );
@@ -696,7 +696,7 @@ class Surfer {
 	 * @param object $wp_query - WP_Query object.
 	 * @return string
 	 */
-	public function search_by_post_title( $where, &$wp_query ) {
+	public function search_by_post_title( $where, $wp_query ) {
 		global $wpdb;
 
 		$search_term = $wp_query->get( 'search_title' );
@@ -1216,7 +1216,7 @@ class Surfer {
 				'wp_admin_url'           => admin_url( 'index.php' ),
 				'baseurl'                => Surfer()->get_baseurl(),
 				// Surfer general usage.
-				'wp_language'            => strtolower( $this->get_langauge_code() ),
+				'wp_language'            => strtolower( $this->get_language_code() ),
 				'learnmore_url'          => 'https://docs.surferseo.com/en/collections/3548643-wpsurfer',
 				'config_url'             => admin_url( 'admin.php?page=surfer#header_core' ),
 				'apiurl'                 => Surfer()->get_surfer()->get_api_url(),
@@ -1247,7 +1247,7 @@ class Surfer {
 	 *
 	 * @return string
 	 */
-	private function get_langauge_code() {
+	private function get_language_code() {
 		$locale = explode( '_', get_locale() );
 		if ( isset( $locale[1] ) ) {
 			return strtoupper( $locale[1] );

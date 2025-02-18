@@ -3,8 +3,8 @@ Contributors: surferseo, xingupl, judytafromsurfer
 Tags: seo, keywords, content writing, content, keyword research
 Requires at least: 6.0
 Requires PHP: 7.4
-Tested up to: 6.7.1
-Stable tag: 1.6.1.542
+Tested up to: 6.7.2
+Stable tag: 1.6.2.552
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -87,6 +87,12 @@ It is not a bug, it is a feature. ;)
 4. Select prewritten, drafted, pending, future, and published content  and export it to WordPress with just a few clicks.
 
 == Changelog ==
+
+= 1.6.2 =
+* FEATURE: Allow to set rel and target arguments for internal and external links during content import
+* FIX: Connection issue that sometimes occurred during exporting from Surfer
+* FIX: Execute shrotcodes during export from WordPress
+* FIX: Other small fixes
 
 = 1.6.1 =
 * FEATURE: Developer tool, to remove old Surfer Backups
@@ -212,6 +218,9 @@ It is not a bug, it is a feature. ;)
 * FEATURE: Export content from Surfer Content Editor to WordPress.
 
 == Upgrade Notice == 
+
+= 1.6.1 =
+Allow to set attributes for links during import
 
 = 1.6.1 =
 Improves Elementor integration and better images handling.

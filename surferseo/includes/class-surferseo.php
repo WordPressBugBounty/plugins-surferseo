@@ -1,6 +1,6 @@
 <?php
 /**
- *  Main object to controll plugin.
+ *  Main object to control plugin.
  *
  * @package SurferSEO
  * @link https://surferseo.com
@@ -17,7 +17,7 @@ use SurferSEO\Surfer\Surfer_Tracking;
 use SurferSEO\Surfer\Surfer_Sidebar;
 
 /**
- * General object to controll plugin.
+ * General object to control plugin.
  */
 class Surferseo {
 
@@ -92,14 +92,14 @@ class Surferseo {
 	protected $autoloader = null;
 
 	/**
-	 * Class to hangle all integrations.
+	 * Class to handle all integrations.
 	 *
 	 * @var Surfer_Tracking
 	 */
 	protected $surfer_tracking = null;
 
 	/**
-	 * Class to hangle all integrations.
+	 * Class to handle all integrations.
 	 *
 	 * @var Surfer_Sidebar
 	 */
@@ -220,7 +220,7 @@ class Surferseo {
 	}
 
 	/**
-	 * Instalation hooks.
+	 * Installation hooks.
 	 *
 	 * @return void
 	 */
@@ -263,12 +263,12 @@ class Surferseo {
 	 */
 	public function add_actions_links( $actions ) {
 
-		$mylinks = array(
+		$my_links = array(
 			'<a href="' . admin_url( 'admin.php?page=surfer' ) . '">' . __( 'Settings', 'surferseo' ) . '</a>',
 			'<a href="' . $this->url_wpsurfer_support . '" target="_blank">' . __( 'Support', 'surferseo' ) . '</a>',
 		);
 
-		$actions = array_merge( $actions, $mylinks );
+		$actions = array_merge( $actions, $my_links );
 		return $actions;
 	}
 
