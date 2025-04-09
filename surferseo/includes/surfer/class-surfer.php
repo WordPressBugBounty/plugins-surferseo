@@ -892,7 +892,12 @@ class Surfer {
 	public function surfer_return_users_list() {
 		$users = array();
 
-		$all_users = get_users( array( 'number' => -1 ) );
+		$all_users = get_users(
+			array(
+				'number'   => 50,
+				'role__in' => array( 'administrator', 'editor', 'author' ),
+			)
+		);
 
 		if ( $all_users ) {
 			foreach ( $all_users as $user ) {
@@ -914,6 +919,9 @@ class Surfer {
 	public function surfer_return_categories() {
 		$args = array(
 			'hide_empty' => false,
+			'orderby'    => 'count',
+			'order'      => 'DESC',
+			'number'     => 50,
 		);
 
 		$categories = get_categories( $args );
@@ -940,6 +948,8 @@ class Surfer {
 		$args = array(
 			'taxonomy'   => 'post_tag',
 			'hide_empty' => false,
+			'orderby'    => 'count',
+			'order'      => 'DESC',
 			'number'     => 50,
 		);
 

@@ -43,7 +43,7 @@ class Gutenberg_Parser extends Content_Parser {
 	}
 
 	/**
-	 * Function interates by HTML tags in provided content.
+	 * Function iterates by HTML tags in provided content.
 	 *
 	 * @param DOMNode|DOMDocument|DOMElement $parent_node - node to parse.
 	 * @param string                         $content     - reference to content variable, to store Gutenberg output.
@@ -74,15 +74,8 @@ class Gutenberg_Parser extends Content_Parser {
 
 		$execute_for_child = true;
 
-		if ( 'ul' === $node_type ) {
-			$execute_for_child = false;
-		}
-
-		if ( 'ol' === $node_type ) {
-			$execute_for_child = false;
-		}
-
-		if ( 'blockquote' === $node_type ) {
+		$skip_for_children = array( 'ul', 'ol', 'blockquote', 'table' );
+		if ( in_array( $node_type, $skip_for_children, true ) ) {
 			$execute_for_child = false;
 		}
 
@@ -138,6 +131,10 @@ class Gutenberg_Parser extends Content_Parser {
 
 		if ( 'pre' === $node_name ) {
 			return $this->parse_node_code( $node, $attributes, $gutenberg_attribute );
+		}
+
+		if ( 'table' === $node_name ) {
+			return $this->parse_node_table( $node, $attributes, $gutenberg_attribute );
 		}
 
 		return '';
@@ -350,7 +347,13 @@ class Gutenberg_Parser extends Content_Parser {
 
 		$content  = '<!-- wp:list -->' . PHP_EOL;
 		$content .= '<ul>' . PHP_EOL;
-		$content .= $node_content . PHP_EOL;
+
+		foreach ( $node->getElementsByTagName( 'li' ) as $li ) {
+			foreach ( $li->getElementsByTagName( 'p' ) as $p ) {
+				$content .= '<li>' . $this->get_inner_html( $p ) . '</li>' . PHP_EOL;
+			}
+		}
+
 		$content .= '</ul>' . PHP_EOL;
 		$content .= '<!-- /wp:list -->' . PHP_EOL . PHP_EOL;
 
@@ -374,7 +377,13 @@ class Gutenberg_Parser extends Content_Parser {
 
 		$content  = '<!-- wp:list {"ordered":true} -->' . PHP_EOL;
 		$content .= '<ol>' . PHP_EOL;
-		$content .= $node_content . PHP_EOL;
+
+		foreach ( $node->getElementsByTagName( 'li' ) as $li ) {
+			foreach ( $li->getElementsByTagName( 'p' ) as $p ) {
+				$content .= '<li>' . $this->get_inner_html( $p ) . '</li>' . PHP_EOL;
+			}
+		}
+
 		$content .= '</ol>' . PHP_EOL;
 		$content .= '<!-- /wp:list -->' . PHP_EOL . PHP_EOL;
 
@@ -442,6 +451,34 @@ class Gutenberg_Parser extends Content_Parser {
 		$content .= $node_content . PHP_EOL;
 		$content .= '</pre>' . PHP_EOL;
 		$content .= '<!-- /wp:code -->' . PHP_EOL . PHP_EOL;
+
+		return $content;
+	}
+
+	/**
+	 * Parses <table> node.
+	 *
+	 * @param DOMNode|DOMDocument|DOMElement $node                - node to parse.
+	 * @param array                          $attributes          - HTML attributes for the node, example: class="" src"".
+	 * @param string                         $gutenberg_attribute - Attributes for Gutenberg tag.
+	 * @return string
+	 */
+	private function parse_node_table( $node, $attributes, $gutenberg_attribute ) {
+
+		$node_content = $this->get_inner_html( $node );
+		if ( '' === $node_content ) {
+			return '';
+		}
+
+		$tbody = $node->getElementsByTagName( 'tbody' );
+
+		$content  = '<!-- wp:table -->' . PHP_EOL;
+		$content .= '<figure class="wp-block-table">' . PHP_EOL;
+		$content .= '<table class="has-fixed-layout">' . PHP_EOL;
+		$content .= '<tbody>' . $this->get_inner_html( $tbody[0] ) . '</tbody>' . PHP_EOL;
+		$content .= '</table>' . PHP_EOL;
+		$content .= '</figure>' . PHP_EOL;
+		$content .= '<!-- /wp:table -->' . PHP_EOL . PHP_EOL;
 
 		return $content;
 	}

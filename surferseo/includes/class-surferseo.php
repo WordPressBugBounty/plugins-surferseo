@@ -131,8 +131,6 @@ class Surferseo {
 
 		$this->init_hooks();
 
-		add_action( 'init', array( $this, 'register_surfer_backup_status' ) );
-
 		add_filter( 'plugin_action_links_surferseo/surferseo.php', array( $this, 'add_actions_links' ) );
 
 		add_filter( 'safe_style_css', array( $this, 'allow_display' ) );
@@ -232,27 +230,6 @@ class Surferseo {
 		register_activation_hook( SURFER_PLUGIN_FILE, array( $installer, 'install' ) );
 
 		add_action( 'upgrader_process_complete', array( $installer, 'surfer_upgrade_completed' ), 10, 2 );
-	}
-
-	/**
-	 * Register new post status, to allow to store backup copies of posts imported from Surfer.
-	 *
-	 * @return void
-	 */
-	public function register_surfer_backup_status() {
-
-		register_post_status(
-			'surfer-backup',
-			array(
-				'label'                     => _x( 'Surfer Backup', 'post', 'surferseo' ),
-				'public'                    => false,
-				'exclude_from_search'       => true,
-				'show_in_admin_all_list'    => false,
-				'show_in_admin_status_list' => true,
-				/* translators: %s - number */
-				'label_count'               => _n_noop( 'Surfer Backup <span class="count">(%s)</span>', 'Surfer Backups <span class="count">(%s)</span>', 'surferseo' ),
-			)
-		);
 	}
 
 	/**

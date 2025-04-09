@@ -4,7 +4,7 @@ Tags: seo, keywords, content writing, content, keyword research
 Requires at least: 6.0
 Requires PHP: 7.4
 Tested up to: 6.7.2
-Stable tag: 1.6.2.552
+Stable tag: 1.6.3.557
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -87,6 +87,13 @@ It is not a bug, it is a feature. ;)
 4. Select prewritten, drafted, pending, future, and published content  and export it to WordPress with just a few clicks.
 
 == Changelog ==
+
+= 1.6.3 =
+* FEATURE: Handle tables export from Surfer
+* FIX: But that sometimes put whole content into single Text element in Elementor
+* FIX: Limit number of tags, categories and users on export list, to avoid errors
+* FIX: Remove <p> tag from inside of the <li> elements in lists
+* FIX: Prevent post publication date change on export
 
 = 1.6.2 =
 * FEATURE: Allow to set rel and target arguments for internal and external links during content import
@@ -219,11 +226,14 @@ It is not a bug, it is a feature. ;)
 
 == Upgrade Notice == 
 
-= 1.6.1 =
+= 1.6.3 =
+Support for tables export and better exports
+
+= 1.6.2 =
 Allow to set attributes for links during import
 
 = 1.6.1 =
-Improves Elementor integration and better images handling.
+Improves Elementor integration and better images handling
 
 = 1.6.0 =
 Support for Surfer AI Meta Tags

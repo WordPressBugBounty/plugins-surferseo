@@ -132,7 +132,12 @@ class Surfer_Form_Config_Ci extends Surfer_Form {
 		$field->set_row_classes( 'surfer-connected' );
 		$this->add_field( $field );
 
-		$all_users = get_users( array( 'number' => -1 ) );
+		$all_users = get_users(
+			array(
+				'number'   => 100,
+				'role__in' => array( 'administrator', 'editor', 'author' ),
+			)
+		);
 
 		$field = new Surfer_Form_Element_Select( 'default_post_author' );
 		$field->set_label( __( 'Author', 'surferseo' ) );
@@ -178,6 +183,7 @@ class Surfer_Form_Config_Ci extends Surfer_Form {
 		$field->add_option( 'noreferrer', __( 'noreferrer', 'surferseo' ) );
 		$field->add_option( 'nofollow', __( 'nofollow', 'surferseo' ) );
 		$field->add_option( 'dofollow', __( 'dofollow', 'surferseo' ) );
+		$field->set_row_classes( 'surfer-connected' );
 		$this->add_field( $field );
 
 		$field = new Surfer_Form_Element_Select( 'internal_links_target' );
@@ -187,6 +193,7 @@ class Surfer_Form_Config_Ci extends Surfer_Form {
 		$field->add_option( '_blank', __( '_blank', 'surferseo' ) );
 		$field->add_option( '_parent', __( '_parent', 'surferseo' ) );
 		$field->add_option( '_top', __( '_top', 'surferseo' ) );
+		$field->set_row_classes( 'surfer-connected' );
 		$this->add_field( $field );
 
 		$field = new Surfer_Form_Element_Checkbox( 'external_links_rel' );
@@ -196,6 +203,7 @@ class Surfer_Form_Config_Ci extends Surfer_Form {
 		$field->add_option( 'noreferrer', __( 'noreferrer', 'surferseo' ) );
 		$field->add_option( 'nofollow', __( 'nofollow', 'surferseo' ) );
 		$field->add_option( 'dofollow', __( 'dofollow', 'surferseo' ) );
+		$field->set_row_classes( 'surfer-connected' );
 		$this->add_field( $field );
 
 		$field = new Surfer_Form_Element_Select( 'external_links_target' );
@@ -205,6 +213,7 @@ class Surfer_Form_Config_Ci extends Surfer_Form {
 		$field->add_option( '_blank', __( '_blank', 'surferseo' ) );
 		$field->add_option( '_parent', __( '_parent', 'surferseo' ) );
 		$field->add_option( '_top', __( '_top', 'surferseo' ) );
+		$field->set_row_classes( 'surfer-connected' );
 		$this->add_field( $field );
 
 		$field->set_row_classes( 'surfer-connected' );

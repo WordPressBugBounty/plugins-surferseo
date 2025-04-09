@@ -63,15 +63,9 @@ class Content_Importer {
 		);
 
 		if ( isset( $args['post_id'] ) && $args['post_id'] > 0 ) {
-
 			$provided_post_id = $args['post_id'];
 			$data['ID']       = $provided_post_id;
 			$post             = (array) get_post( $provided_post_id );
-
-			// Create copy of the post as a backup.
-			unset( $post['ID'] );
-			$post['post_status'] = 'surfer-backup';
-			wp_insert_post( $post );
 		}
 
 		$this->resolve_post_author( $args, $data );
@@ -82,7 +76,7 @@ class Content_Importer {
 		$this->resolve_post_tags( $args, $data );
 		$this->resolve_post_meta_details( $args, $data );
 
-		if ( isset( $post ) && 'published' === $post['post_status'] ) {
+		if ( isset( $post ) && 'publish' === $post['post_status'] ) {
 			// WordPress set current date as default and we do not want to change publication date.
 			$data['post_date']     = $post['post_date'];
 			$data['post_date_gmt'] = $post['post_date_gmt'];

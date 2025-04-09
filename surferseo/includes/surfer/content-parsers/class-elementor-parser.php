@@ -86,7 +86,6 @@ class Elementor_Parser extends Content_Parser {
 		update_post_meta( $post_id, '_elementor_template_type', ( $elementor_template ) ? 'page' : 'wp-post' );
 		update_post_meta( $post_id, '_elementor_version', ELEMENTOR_VERSION );
 		update_post_meta( $post_id, '_elementor_data', $this->get_elementor_data( $post_id ) );
-		// update_post_meta( $post_id, '_elementor_page_assets', $this->get_page_assets( $post_id ) );
 		update_post_meta( $post_id, '_wp_page_template', $page_template );
 	}
 
@@ -148,7 +147,7 @@ class Elementor_Parser extends Content_Parser {
 
 
 	/**
-	 * Function interates by HTML tags in provided content.
+	 * Function iterates by HTML tags in provided content.
 	 *
 	 * @param DOMDocument $parent_node - node to parse.
 	 * @param array       $content     - reference to content variable, to store Gutenberg output.
@@ -224,6 +223,10 @@ class Elementor_Parser extends Content_Parser {
 
 		if ( 'blockquote' === $node_name ) {
 			return $this->parse_node_blockquote( $node, $elementor_styling );
+		}
+
+		if ( 'table' === $node_name ) {
+			return $this->parse_node_table( $node, $elementor_styling );
 		}
 
 		return '';
@@ -433,6 +436,44 @@ class Elementor_Parser extends Content_Parser {
 			$settings = clone $elementor_styling['html'];
 		}
 		$settings->html    = $node_content;
+		$element->settings = $settings;
+
+		$element->elements   = array();
+		$element->widgetType = 'html'; // @codingStandardsIgnoreLine
+
+		return $element;
+	}
+
+
+	/**
+	 * Parses <table> node.
+	 *
+	 * @param DOMNode|DOMDocument|DOMElement $node                - node to parse.
+	 * @param array                          $elementor_styling - array with Elementor styling.
+	 * @return string
+	 */
+	private function parse_node_table( $node, $elementor_styling ) {
+
+		$node_content = $this->get_inner_html( $node );
+		if ( empty( $node_content ) || '' === $node_content ) {
+			return '';
+		}
+
+		$element         = new \stdClass();
+		$element->id     = substr( wp_generate_uuid4(), 0, 8 );
+		$element->elType = 'widget'; // @codingStandardsIgnoreLine
+
+		$settings = new \stdClass();
+		if ( isset( $elementor_styling['html'] ) ) {
+			$settings = clone $elementor_styling['html'];
+		}
+		$escaped_html = str_replace(
+			array( '"', "'" ),
+			array( '&quot;', '&#39;' ),
+			'<table>' . $node_content . '</table>'
+		);
+
+		$settings->html    = $escaped_html;
 		$element->settings = $settings;
 
 		$element->elements   = array();
