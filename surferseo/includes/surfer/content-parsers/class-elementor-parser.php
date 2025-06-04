@@ -53,17 +53,6 @@ class Elementor_Parser extends Content_Parser {
 			}
 		}
 
-		$tags = $doc->getElementsByTagName( 'img' );
-
-		foreach ( $tags as $tag ) {
-			$image_url = $tag->getAttribute( 'src' );
-			$image_alt = $tag->getAttribute( 'alt' );
-
-			$media_library_image_url = $this->download_img_to_media_library( $image_url, $image_alt );
-
-			$content = str_replace( $image_url, $media_library_image_url, $content );
-		}
-
 		return $content;
 	}
 
@@ -105,6 +94,8 @@ class Elementor_Parser extends Content_Parser {
 		$utf8_fix_suffix = '</body></html>';
 
 		$doc->loadHTML( $utf8_fix_prefix . $content . $utf8_fix_suffix, LIBXML_HTML_NODEFDTD | LIBXML_SCHEMA_CREATE );
+
+		$doc = $this->remove_p_from_lists( $doc );
 
 		$settings                 = new \stdClass();
 		$settings->flex_direction = 'column';
@@ -284,7 +275,7 @@ class Elementor_Parser extends Content_Parser {
 		if ( isset( $elementor_styling['text-editor'] ) ) {
 			$settings = clone $elementor_styling['text-editor'];
 		}
-		$settings->editor = '<ul>' . str_replace( "\'", "'", addslashes( $this->get_inner_html( $node ) ) ) . '</p>';
+		$settings->editor = '<ul>' . str_replace( "\'", "'", addslashes( $this->get_inner_html( $node ) ) ) . '</ul>';
 
 		if ( isset( $attributes['align'] ) ) {
 			$settings->align = $attributes['align'];
@@ -548,5 +539,39 @@ class Elementor_Parser extends Content_Parser {
 		}
 
 		return $attributes;
+	}
+
+		/**
+		 * Remove <p> tags from lists.
+		 *
+		 * @param DOMDocument $doc - DOM document.
+		 * @return DOMDocument
+		 */
+	private function remove_p_from_lists( $doc ) {
+		$list_items = $doc->getElementsByTagName( 'li' );
+
+		$li_array = array();
+		foreach ( $list_items as $li ) {
+			$li_array[] = $li;
+		}
+
+		foreach ( $li_array as $li ) {
+			$paragraphs = $li->getElementsByTagName( 'p' );
+
+			$p_array = array();
+			foreach ( $paragraphs as $p ) {
+				$p_array[] = $p;
+			}
+
+			foreach ( $p_array as $p ) {
+				while ( $p->firstChild ) { // phpcs:ignore
+					$li->insertBefore( $p->firstChild, $p ); // phpcs:ignore
+				}
+
+				$li->removeChild( $p );
+			}
+		}
+
+		return $doc;
 	}
 }

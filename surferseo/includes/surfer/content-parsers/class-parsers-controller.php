@@ -8,6 +8,10 @@
 
 namespace SurferSEO\Surfer\Content_Parsers;
 
+if ( ! defined( 'SURFER_ASYNC_THRESHOLD' ) ) {
+	define( 'SURFER_ASYNC_THRESHOLD', 8 );
+}
+
 /**
  * Object that imports data from different sources into WordPress.
  */
@@ -20,6 +24,18 @@ class Parsers_Controller {
 	 */
 	protected $chosen_parser = null;
 
+	/**
+	 * Image processing mode.
+	 *
+	 * @var string
+	 */
+	protected $image_processing_mode = 'sync';
+
+	/**
+	 * Available parsers.
+	 *
+	 * @var array
+	 */
 	public const AUTOMATIC      = '';
 	public const CLASSIC_EDITOR = 'classic';
 	public const GUTENBERG      = 'gutenberg';
@@ -56,6 +72,7 @@ class Parsers_Controller {
 		}
 
 		$this->load_parser( $config_parser );
+		$this->chosen_parser->set_image_processing_mode( $this->image_processing_mode );
 	}
 
 	/**
@@ -122,7 +139,7 @@ class Parsers_Controller {
 	 */
 	private function if_user_is_using_classic_editor() {
 
-		// ( WP < 5.0 && ! Gutenberg Plugin ) || ( WP > 5.0 && Gutendber Plugin )
+		// ( WP < 5.0 && ! Gutenberg Plugin ) || ( WP > 5.0 && Gutenberg Plugin )
 		$wp_version                     = get_bloginfo( 'version' );
 		$if_gutenberg_is_active         = surfer_check_if_plugins_is_active( 'gutenberg/gutenberg.php' );
 		$if_disable_gutenberg_is_active = surfer_check_if_plugins_is_active( 'disable-gutenberg/disable-gutenberg.php' );
@@ -184,5 +201,23 @@ class Parsers_Controller {
 	public function run_after_post_insert_actions( $post_id ) {
 
 		$this->chosen_parser->run_after_post_insert_actions( $post_id );
+	}
+
+
+	/**
+	 * Get image processing mode.
+	 *
+	 * @param int $image_count - number of images in content.
+	 * @return void
+	 */
+	public function set_image_processing_mode( $image_count ) {
+		$image_processing_mode = Surfer()->get_surfer_settings()->get_option( 'content-importer', 'image_processing_mode', 'auto' );
+
+		if ( 'async' === $image_processing_mode || ( 'auto' === $image_processing_mode && $image_count > SURFER_ASYNC_THRESHOLD ) ) {
+			$this->image_processing_mode = 'async';
+			return;
+		}
+
+		$this->image_processing_mode = 'sync';
 	}
 }

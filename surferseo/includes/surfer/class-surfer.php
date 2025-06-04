@@ -8,7 +8,6 @@
 
 namespace SurferSEO\Surfer;
 
-use PHP_CodeSniffer\Tokenizers\JS;
 use SurferSEO\Surferseo;
 use SurferSEO\Surfer\Integrations\Integrations;
 use SurferSEO\Surfer\Surfer_GSC;
@@ -39,6 +38,13 @@ class Surfer {
 	 * @var string
 	 */
 	protected $surfer_privacy_policy = 'https://surferseo.com/privacy-policy/';
+
+	/**
+	 * Class that handle importing content from Surfer/GoogleDocs into WordPress.
+	 *
+	 * @var Surfer_Logger
+	 */
+	protected $logger = null;
 
 	/**
 	 * Class that handle importing content from Surfer/GoogleDocs into WordPress.
@@ -160,6 +166,15 @@ class Surfer {
 	 */
 	public function get_gsc() {
 		return $this->gsc;
+	}
+
+	/**
+	 * Returns logger object.
+	 *
+	 * @return Surfer_Logger
+	 */
+	public function get_surfer_logger() {
+		return $this->logger;
 	}
 
 	/**
@@ -306,6 +321,7 @@ class Surfer {
 	 * @return void
 	 */
 	private function import_features() {
+		$this->logger            = new Surfer_Logger();
 		$this->content_importer  = new Content_Importer();
 		$this->content_exporter  = new Content_Exporter();
 		$this->keyword_surfer    = new Keyword_Surfer();
@@ -401,7 +417,15 @@ class Surfer {
 
 			update_option( 'surfer_connection_details', $connection_details, false );
 
-			$response = new WP_REST_Response( array( 'token_saved' => $token_saved ) );
+			$response_data = array( 'token_saved' => $token_saved );
+			$json_data     = wp_json_encode( $response_data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES );
+
+			$json_data = preg_replace( '/^\xEF\xBB\xBF/', '', $json_data );
+			$json_data = trim( $json_data, "\xEF\xBB\xBF" );
+
+			$response = new WP_REST_Response();
+			$response->set_data( json_decode( $json_data ) );
+			$response->header( 'Content-Type', 'application/json; charset=utf-8' );
 		} else {
 			$response = new WP_REST_Response( array( 'error' => __( 'Token verification failed', 'surferseo' ) ), 403 );
 		}
@@ -710,7 +734,7 @@ class Surfer {
 	 * Get categories from post, and transfer them into values for select in Surfer.
 	 *
 	 * @param int $post_id - ID of the post.
-	 * return array
+	 * @return array
 	 */
 	private function convert_categories_to_surfer_select( $post_id ) {
 
@@ -732,7 +756,7 @@ class Surfer {
 	 * Get tags from post, and transfer them into values for select in Surfer.
 	 *
 	 * @param int $post_id - ID of the post.
-	 * return array
+	 * @return array
 	 */
 	private function convert_tags_to_surfer_select( $post_id ) {
 

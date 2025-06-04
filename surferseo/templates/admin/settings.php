@@ -44,9 +44,17 @@ use SurferSEO\Surferseo;
 						<p>
 							<?php esc_html_e( 'In case you have any troubles with the plugin, please click the button below to download a .txt file with debug information, and send it to our Support team. This will speed up the debug process. Thank you.', 'surferseo' ); ?>
 						</p>
-						<a class="surfer-button surfer-button--secondary surfer-button--small" target="_blank" href="<?php echo esc_html( admin_url( 'admin.php?page=surfer&action=download_debug_data' ) ); ?>">
-							<?php esc_html_e( 'Download debug data', 'surferseo' ); ?>
-						</a>
+						<div class="surfer-debug-buttons">
+							<a class="surfer-button surfer-button--secondary surfer-button--small" target="_blank" href="<?php echo esc_html( admin_url( 'admin.php?page=surfer&action=download_debug_data' ) ); ?>">
+								<?php esc_html_e( 'Download debug data', 'surferseo' ); ?>
+							</a>
+							<a class="surfer-button surfer-button--secondary surfer-button--small" target="_blank" href="<?php echo esc_html( admin_url( 'admin.php?page=surfer&action=download_import_logs' ) ); ?>">
+								<?php esc_html_e( 'Download import logs', 'surferseo' ); ?>
+							</a>
+							<a class="surfer-button surfer-button--secondary surfer-button--small" target="_blank" href="<?php echo esc_html( admin_url( 'admin.php?page=surfer&action=download_export_logs' ) ); ?>">
+								<?php esc_html_e( 'Download export logs', 'surferseo' ); ?>
+							</a>
+						</div>
 					</div>
 
 					<?php /* translators: %1$s & %2$s is replaced with "url" */ ?>

@@ -20,6 +20,13 @@ class Content_Parser {
 	 */
 	protected $title;
 
+	/**
+	 * Image processing mode.
+	 *
+	 * @var string
+	 */
+	protected $image_processing_mode = 'sync';
+
 
 	/**
 	 * Returns content for chosen editor.
@@ -79,31 +86,89 @@ class Content_Parser {
 	}
 
 	/**
-	 * Saves image from provided URL into WordPress media library
+	 * Download image to media library or queue for background processing.
 	 *
-	 * @param string $image_url - URL to the image.
-	 * @param string $image_alt - Alternative text for the image.
-	 * @param bool   $url_only  - if true, returns only URL to image, if false, returns image ID.
-	 * @return string URL to image in media library.
+	 * @param string $image_url - URL of the image.
+	 * @param string $image_alt - Alt text for the image.
+	 * @param bool   $url_only - return only URL.
+	 * @return string
 	 */
-	protected function download_img_to_media_library( $image_url, $image_alt = '', $url_only = true ) {
+	protected function download_img_to_media_library( $image_url, $image_alt, $url_only = true ) {
 
-		$image_id = $this->find_image_by_url( $image_url );
-		if ( 0 === $image_id ) {
-			$image_id = $this->upload_images_to_wp( $image_url );
+		$existing_attachment = $this->find_existing_attachment( $image_url );
+		if ( $existing_attachment ) {
+			if ( $url_only ) {
+				return wp_get_attachment_url( $existing_attachment );
+			}
+			return array(
+				'url' => wp_get_attachment_url( $existing_attachment ),
+				'id'  => $existing_attachment,
+			);
 		}
 
-		$this->update_image_alt( $image_id, $image_alt );
-		$media_library_image_url = wp_get_attachment_url( $image_id );
+		if ( 'async' === $this->image_processing_mode ) {
+			$this->queue_image_download( $image_url, $image_alt );
+			if ( $url_only ) {
+				return $image_url;
+			}
+			return array(
+				'url' => $image_url,
+				'id'  => 0,
+			);
+		}
+
+		$image_upload = $this->download_image_sync( $image_url );
+
+		if ( ! $image_upload ) {
+			return $image_url;
+		}
 
 		if ( $url_only ) {
-			return $media_library_image_url;
+			return $image_upload['url'];
 		}
+		return $image_upload;
+	}
 
-		return array(
-			'id'  => $image_id,
-			'url' => $media_library_image_url,
+	/**
+	 * Queue image for background download.
+	 *
+	 * @param string $image_url - URL of the image.
+	 * @param string $image_alt - Alt text for the image.
+	 * @return void
+	 */
+	private function queue_image_download( $image_url, $image_alt ) {
+		$queue   = get_option( 'surfer_image_download_queue', array() );
+		$queue[] = array(
+			'url'       => $image_url,
+			'alt'       => $image_alt,
+			'timestamp' => time(),
 		);
+		update_option( 'surfer_image_download_queue', $queue );
+
+		if ( ! wp_next_scheduled( 'surfer_process_image_queue' ) ) {
+			wp_schedule_single_event( time() + 5, 'surfer_process_image_queue' );
+		}
+	}
+
+	/**
+	 * Find existing attachment by URL.
+	 *
+	 * @param string $image_url - URL of the image.
+	 * @return int|false
+	 */
+	private function find_existing_attachment( $image_url ) {
+		global $wpdb;
+
+		$attachment_id = $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT post_id FROM {$wpdb->postmeta} 
+			 WHERE meta_key = 'surfer_file_original_url' 
+			 AND meta_value LIKE %s",
+				$image_url
+			)
+		);
+
+		return $attachment_id ? (int) $attachment_id : false;
 	}
 
 	/**
@@ -112,7 +177,7 @@ class Content_Parser {
 	 * @param string $image_url - URL to the image.
 	 * @return int
 	 */
-	private function upload_images_to_wp( $image_url ) {
+	private function download_image_sync( $image_url ) {
 
 		if ( empty( $image_url ) || ! wp_http_validate_url( $image_url ) ) {
 			return 0;
@@ -124,6 +189,10 @@ class Content_Parser {
 
 		$file_name     = basename( $image_url );
 		$tmp_directory = download_url( $image_url );
+
+		if ( is_wp_error( $tmp_directory ) ) {
+			return 0;
+		}
 
 		$extension = pathinfo( $image_url, PATHINFO_EXTENSION );
 		if ( empty( $extension ) || '' === $extension ) {
@@ -153,39 +222,10 @@ class Content_Parser {
 		update_post_meta( $attachment_id, 'surfer_file_original_url', $image_url );
 		@unlink( $tmp_directory ); // phpcs:ignore
 
-		return $attachment_id;
-	}
-
-	/**
-	 * Search for image by URL and return it's ID.
-	 *
-	 * @param string $image_url - URL to the image.
-	 * @return int
-	 */
-	private function find_image_by_url( $image_url ) {
-
-		$image_id = 0;
-
-		$args = array(
-			'post_type'      => 'attachment',
-			'meta_query'     => array(
-				array(
-					'key'   => 'surfer_file_original_url',
-					'value' => $image_url,
-				),
-			),
-			'posts_per_page' => 1,
-			'post_status'    => 'inherit',
+		return array(
+			'url' => wp_get_attachment_url( $attachment_id ),
+			'id'  => $attachment_id,
 		);
-
-		$matching_images = get_posts( $args );
-
-		if ( $matching_images ) {
-			$image    = array_pop( $matching_images );
-			$image_id = $image->ID;
-		}
-
-		return $image_id;
 	}
 
 	/**
@@ -284,5 +324,16 @@ class Content_Parser {
 		}
 
 		return $doc;
+	}
+
+
+	/**
+	 * Get image processing mode.
+	 *
+	 * @param string $processing_mode - processing mode.
+	 * @return void
+	 */
+	public function set_image_processing_mode( $processing_mode ) {
+		$this->image_processing_mode = $processing_mode;
 	}
 }

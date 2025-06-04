@@ -33,29 +33,6 @@ jQuery(function ($) {
     check_gsc_result()
   })
 
-  function transfer_data_to_new_format() {
-    var data = {
-      action: 'surfer_transfer_gsc_data_to_new_format',
-      _surfer_nonce: surfer_lang._surfer_nonce,
-    }
-
-    $.ajax({
-      url: surfer_lang.ajaxurl,
-      type: 'POST',
-      data: data,
-      dataType: 'json',
-      async: true,
-      success: function (response) {
-        $('.surfer-gsc-transfer-data-box__result').text(response)
-      },
-    })
-  }
-
-  $('.surfer-gsc-transfer-data-box__button').on('click', function (event) {
-    event.preventDefault()
-    transfer_data_to_new_format()
-  })
-
   function reconnect_posts_with_drafts() {
     var data = {
       action: 'surfer_gather_posts_to_reconnect',

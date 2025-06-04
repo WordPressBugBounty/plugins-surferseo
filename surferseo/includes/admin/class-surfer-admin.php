@@ -28,8 +28,7 @@ class Surfer_Admin {
 		add_action( 'admin_enqueue_scripts', array( $this, 'admin_enqueue_scripts' ) );
 
 		add_action( 'admin_init', array( $this, 'init_filters' ) );
-		add_action( 'admin_init', array( $this, 'download_debug_data' ) );
-		add_action( 'admin_init', array( $this, 'clear_backup_posts' ) );
+		add_action( 'admin_init', array( $this, 'handle_admin_actions' ) );
 
 		add_action( 'admin_notices', array( $this, 'check_wordfence_application_password_protection' ) );
 		add_action( 'admin_notices', array( $this, 'check_elementor_grid_settings' ) );
@@ -359,14 +358,6 @@ class Surfer_Admin {
 	 * Page to download debug data in form of a txt file.
 	 */
 	public function download_debug_data() {
-		if ( ! isset( $_GET['page'] ) || 'surfer' !== sanitize_text_field( wp_unslash( $_GET['page'] ) ) ) { // phpcs:ignore WordPress.Security.NonceVerification
-			return;
-		}
-
-		if ( ! isset( $_GET['action'] ) || 'download_debug_data' !== sanitize_text_field( wp_unslash( $_GET['action'] ) ) ) { // phpcs:ignore WordPress.Security.NonceVerification
-			return;
-		}
-
 		if ( ! current_user_can( 'manage_options' ) ) {
 			return;
 		}
@@ -378,26 +369,9 @@ class Surfer_Admin {
 		header( 'Content-Length: ' . strlen( $debug_data ) );
 		header( 'Connection: close' );
 
-		echo $debug_data; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+		echo esc_html( $debug_data );
 
 		exit;
-	}
-
-	/**
-	 * Clear backup posts.
-	 */
-	public function clear_backup_posts() {
-		if ( ! isset( $_GET['page'] ) || 'surfer' !== sanitize_text_field( wp_unslash( $_GET['page'] ) ) ) { // phpcs:ignore WordPress.Security.NonceVerification
-			return;
-		}
-
-		if ( ! isset( $_GET['action'] ) || 'clear_backup_posts' !== sanitize_text_field( wp_unslash( $_GET['action'] ) ) ) { // phpcs:ignore WordPress.Security.NonceVerification
-			return;
-		}
-
-		if ( ! current_user_can( 'manage_options' ) ) {
-			return;
-		}
 	}
 
 	/**
@@ -427,5 +401,75 @@ class Surfer_Admin {
 		$content .= 'ACTIVE PLUGINS: ' . print_r( Surfer()->get_surfer_tracking()->get_active_plugins(), true ) . PHP_EOL . PHP_EOL;
 
 		return $content;
+	}
+
+	/**
+	 * Handle admin actions.
+	 */
+	public function handle_admin_actions() {
+		if ( ! isset( $_GET['page'] ) || 'surfer' !== $_GET['page'] ) {
+			return;
+		}
+
+		if ( ! isset( $_GET['action'] ) ) {
+			return;
+		}
+
+		$action = sanitize_text_field( wp_unslash( $_GET['action'] ) );
+
+		switch ( $action ) {
+			case 'download_debug_data':
+				$this->download_debug_data();
+				break;
+			case 'download_import_logs':
+				$this->download_logs( 'import' );
+				break;
+			case 'download_export_logs':
+				$this->download_logs( 'export' );
+				break;
+		}
+	}
+
+	/**
+	 * Download logs for given operation type.
+	 *
+	 * @param string $operation_type Operation type (import/export).
+	 * @return void
+	 */
+	private function download_logs( $operation_type ) {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'You do not have sufficient permissions to access this page.', 'surferseo' ) );
+		}
+
+		$logger   = Surfer()->get_surfer()->get_surfer_logger();
+		$log_file = $logger->get_log_file_path( $operation_type );
+
+		if ( ! file_exists( $log_file ) ) {
+			wp_die( esc_html__( 'Log file not found.', 'surferseo' ) );
+		}
+
+		global $wp_filesystem;
+		if ( ! function_exists( 'WP_Filesystem' ) ) {
+			require_once ABSPATH . 'wp-admin/includes/file.php';
+		}
+
+		if ( ! WP_Filesystem() ) {
+			wp_die( esc_html__( 'Could not initialize filesystem.', 'surferseo' ) );
+		}
+
+		$filename     = 'surfer-' . $operation_type . '-logs-' . current_time( 'Y-m-d-H-i-s' ) . '.xml';
+		$file_content = $wp_filesystem->get_contents( $log_file );
+
+		if ( false === $file_content ) {
+			wp_die( esc_html__( 'Could not read log file.', 'surferseo' ) );
+		}
+
+		header( 'Content-Type: application/xml' );
+		header( 'Content-Disposition: attachment; filename="' . $filename . '"' );
+		header( 'Content-Length: ' . filesize( $file_content ) );
+		header( 'Connection: close' );
+
+		echo esc_html( $file_content );
+		exit;
 	}
 }

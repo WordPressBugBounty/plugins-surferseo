@@ -9,9 +9,10 @@
 namespace SurferSEO\Surfer;
 
 use DOMDocument;
-use PHP_CodeSniffer\Tokenizers\PHP;
+use DOMElement;
 use SurferSEO\Surfer;
 use SurferSEO\Surferseo;
+use SurferSEO\Surfer\Surfer_Logger;
 
 /**
  * Content exporter object.
@@ -30,8 +31,8 @@ class Content_Exporter {
 	 * Init function.
 	 */
 	public function init() {
-		add_filter( 'post_row_actions', array( $this, 'add_export_content_buttonto_posts_list' ), 10, 2 );
-		add_filter( 'page_row_actions', array( $this, 'add_export_content_buttonto_posts_list' ), 10, 2 );
+		add_filter( 'post_row_actions', array( $this, 'add_export_content_button_to_posts_list' ), 10, 2 );
+		add_filter( 'page_row_actions', array( $this, 'add_export_content_button_to_posts_list' ), 10, 2 );
 
 		add_filter( 'wp_ajax_surfer_create_content_editor', array( $this, 'create_content_editor' ) );
 		add_filter( 'wp_ajax_surfer_update_content_editor', array( $this, 'update_content_editor' ) );
@@ -51,7 +52,7 @@ class Content_Exporter {
 	 * @param array   $actions - actions array.
 	 * @param WP_Post $post - post object.
 	 */
-	public function add_export_content_buttonto_posts_list( $actions, $post ) {
+	public function add_export_content_button_to_posts_list( $actions, $post ) {
 		$draft_id = get_post_meta( $post->ID, 'surfer_draft_id', true );
 
 		if ( $draft_id ) {
@@ -116,48 +117,63 @@ class Content_Exporter {
 	 * Makes update content to Surfer.
 	 */
 	public function update_content_editor() {
-		$json = file_get_contents( 'php://input' );
-		$data = json_decode( $json );
+		$logger = Surfer()->get_surfer()->get_surfer_logger();
+		$json   = file_get_contents( 'php://input' );
+		$data   = json_decode( $json );
 
 		if ( ! surfer_validate_custom_request( $data->_surfer_nonce ) ) {
+			$logger->log_export( '', '', null, 'Security check failed.' );
 			echo wp_json_encode( array( 'message' => 'Security check failed.' ) );
 			wp_die();
 		}
 
-		$keywords = isset( $data->keywords ) ? $data->keywords : false;
+		try {
+			$original_content = isset( $data->content ) ? $data->content : '';
+			$content          = isset( $data->content ) ? wp_kses_post( $this->parse_content_for_surfer( $data->content ) ) : false;
 
-		$content          = isset( $data->content ) ? wp_kses_post( $this->parse_content_for_surfer( $data->content ) ) : false;
-		$draft_id         = isset( $data->draft_id ) ? intval( $data->draft_id ) : false;
-		$post_id          = isset( $data->post_id ) ? intval( $data->post_id ) : false;
-		$permalink_hash   = isset( $data->permalink_hash ) ? sanitize_text_field( wp_unslash( $data->permalink_hash ) ) : false;
-		$keywords         = is_array( $data->keywords ) ? array_map( 'sanitize_text_field', $data->keywords ) : sanitize_text_field( wp_unslash( $data->keywords ) );
-		$location         = isset( $data->location ) ? sanitize_text_field( wp_unslash( $data->location ) ) : false;
-		$meta_title       = isset( $data->post_id ) ? sanitize_text_field( wp_unslash( Surfer()->get_surfer()->get_post_meta_title( $data->post_id ) ) ) : false;
-		$meta_description = isset( $data->post_id ) ? sanitize_text_field( wp_unslash( Surfer()->get_surfer()->get_post_meta_description( $data->post_id ) ) ) : false;
+			$keywords = isset( $data->keywords ) ? $data->keywords : false;
 
-		$params = array(
-			'draft_id'         => $draft_id,
-			'content'          => $content,
-			'wp_post_id'       => $post_id,
-			'url'              => apply_filters( 'surfer_api_base_url', get_site_url() ),
-			'meta_title'       => $meta_title,
-			'meta_description' => $meta_description,
-		);
+			$draft_id         = isset( $data->draft_id ) ? intval( $data->draft_id ) : false;
+			$post_id          = isset( $data->post_id ) ? intval( $data->post_id ) : false;
+			$permalink_hash   = isset( $data->permalink_hash ) ? sanitize_text_field( wp_unslash( $data->permalink_hash ) ) : false;
+			$keywords         = is_array( $data->keywords ) ? array_map( 'sanitize_text_field', $data->keywords ) : sanitize_text_field( wp_unslash( $data->keywords ) );
+			$location         = isset( $data->location ) ? sanitize_text_field( wp_unslash( $data->location ) ) : false;
+			$meta_title       = isset( $data->post_id ) ? sanitize_text_field( wp_unslash( Surfer()->get_surfer()->get_post_meta_title( $data->post_id ) ) ) : false;
+			$meta_description = isset( $data->post_id ) ? sanitize_text_field( wp_unslash( Surfer()->get_surfer()->get_post_meta_description( $data->post_id ) ) ) : false;
 
-		list(
-			'code'     => $code,
-			'response' => $response,
-		) = Surfer()->get_surfer()->make_surfer_request( '/import_content_update', $params );
+			$params = array(
+				'draft_id'         => $draft_id,
+				'content'          => $content,
+				'wp_post_id'       => $post_id,
+				'url'              => apply_filters( 'surfer_api_base_url', get_site_url() ),
+				'meta_title'       => $meta_title,
+				'meta_description' => $meta_description,
+			);
 
-		if ( 200 === $code || 201 === $code ) {
-			update_post_meta( $post_id, 'surfer_last_post_update', round( microtime( true ) * 1000 ) );
-			update_post_meta( $post_id, 'surfer_last_post_update_direction', 'from WordPress to Surfer' );
+			list(
+				'code'     => $code,
+				'response' => $response,
+			) = Surfer()->get_surfer()->make_surfer_request( '/import_content_update', $params );
 
-			$this->save_post_surfer_details( $post_id, $keywords, $location, $draft_id, $permalink_hash );
+			if ( 200 === $code || 201 === $code ) {
+				$logger->log_export( $original_content, $content, true );
+				update_post_meta( $post_id, 'surfer_last_post_update', round( microtime( true ) * 1000 ) );
+				update_post_meta( $post_id, 'surfer_last_post_update_direction', 'from WordPress to Surfer' );
+
+				$this->save_post_surfer_details( $post_id, $keywords, $location, $draft_id, $permalink_hash );
+			} else {
+				$error_message = isset( $response['message'] ) ? $response['message'] : 'Unknown API error';
+				$logger->log_export( $original_content, $content, $error_message );
+			}
+
+			echo wp_json_encode( $response );
+			wp_die();
+
+		} catch ( \Exception $e ) {
+			$logger->log_export( $original_content ?? '', '', null, $e->getMessage() );
+			echo wp_json_encode( array( 'message' => 'Export failed: ' . $e->getMessage() ) );
+			wp_die();
 		}
-
-		echo wp_json_encode( $response );
-		wp_die();
 	}
 
 	/**
@@ -266,6 +282,17 @@ class Content_Exporter {
 			// We need to get IMGs from <p> tag, to allow Surfer to handle this.
 			if ( strlen( $node_content ) > 0 && false !== strpos( $node_content, '<img' ) ) {
 				$content .= $node_content;
+				// @codingStandardsIgnoreLine
+			} elseif ( 'li' === $node->nodeName ) {
+				$content .= '<li>' . $node_content . '</li>' . PHP_EOL;
+				// @codingStandardsIgnoreLine
+			} elseif ( 'p' === $node->nodeName ) {
+				$content .= '<p>' . $node_content . '</p>' . PHP_EOL;
+				// @codingStandardsIgnoreLine
+			} elseif ( in_array( $node->nodeName, array( 'h1', 'h2', 'h3', 'h4', 'h5', 'h6' ) ) ) {
+				// @codingStandardsIgnoreLine
+				$content .= '<' . $node->nodeName . '>' . $node_content . '</' . $node->nodeName . '>' . PHP_EOL;
+				// @codingStandardsIgnoreLine
 			} elseif ( 'img' === $node->nodeName ) { // @codingStandardsIgnoreLine
 				$attributes           = array();
 				$attributes['src']    = $node->getAttribute( 'src' );
@@ -275,9 +302,9 @@ class Content_Exporter {
 				$attributes['height'] = $node->getAttribute( 'height' );
 				$attributes['class']  = $node->getAttribute( 'class' );
 				$content             .= '<img' . $this->glue_attributes( $attributes ) . ' />' . PHP_EOL;
-			} else {
+			} elseif ( $node->hasChildNodes() ) {
 				// @codingStandardsIgnoreLine
-				$content .= '<' . $node->nodeName . '>' . $node_content . '</' . $node->nodeName . '>';
+				$this->parse_dom_node( $node, $content );
 			}
 		}
 	}

@@ -169,10 +169,28 @@ class Surfer_Form_Config_Ci extends Surfer_Form {
 
 		$tags = get_tags( $args );
 
+		$field = new Surfer_Form_Element_Select( 'default_tags' );
+		$field->set_label( __( 'Tag', 'surferseo' ) );
+		$field->add_option( '', __( '- Select an option -', 'surferseo' ) );
+		$field->set_row_classes( 'surfer-connected' );
+		foreach ( $tags as $tag ) {
+			$field->add_option( $tag->term_id, $tag->name );
+		}
+		$this->add_field( $field );
+
 		$field = new Surfer_Form_Element_Checkbox( 'disable_elementor' );
 		$field->set_label( '' );
 		$field->add_option( 1, __( 'Disable Surfer writing guidelines in Elementor editor', 'surferseo' ) );
 		$field->set_renderer( array( $this, 'render_switch' ) );
+		$field->set_row_classes( 'surfer-connected' );
+		$this->add_field( $field );
+
+		$field = new Surfer_Form_Element_Select( 'image_processing_mode' );
+		$field->set_label( __( 'Image Processing Mode', 'surferseo' ) );
+		$field->set_hint( __( 'Choose how to handle images during import. Async mode prevents timeouts but images are processed in background.', 'surferseo' ) );
+		$field->add_option( 'sync', __( 'Synchronous (immediate)', 'surferseo' ) );
+		$field->add_option( 'async', __( 'Asynchronous (background)', 'surferseo' ) );
+		$field->add_option( 'auto', __( 'Auto (async for 8+ images)', 'surferseo' ) );
 		$field->set_row_classes( 'surfer-connected' );
 		$this->add_field( $field );
 
@@ -329,6 +347,19 @@ class Surfer_Form_Config_Ci extends Surfer_Form {
 
 		// phpcs:ignore
 		if ( isset( $_GET['developer_mode'] ) && 1 === intval( $_GET['developer_mode'] ) ) {
+			$field = new Surfer_Form_Element_Text( 'wpsurfer_api_access_key' );
+		} else {
+			$field = new Surfer_Form_Element_Hidden( 'wpsurfer_api_access_key' );
+		}
+		$field->set_label( __( 'Surfer API Key', 'surferseo' ) );
+		$field->set_hint( __( '[DEVELOPER FIELD] API key used to make requests to Surfer API.', 'surferseo' ) );
+		$field->set_classes( 'regular-text' );
+		$field->set_value( get_option( 'wpsurfer_api_access_key', false ) );
+		$field->add_validator( new Validator_Is_Required() );
+		$this->add_field( $field );
+
+		// phpcs:ignore
+		if ( isset( $_GET['developer_mode'] ) && 1 === intval( $_GET['developer_mode'] ) ) {
 			$field = new Surfer_Form_Element_Text( 'surfer_test_gsc_export' );
 			$field->set_label( __( 'Force GSC Data', 'surferseo' ) );
 			$field->set_hint( __( 'On click data from GSC will be gathered.', 'surferseo' ) );
@@ -339,12 +370,6 @@ class Surfer_Form_Config_Ci extends Surfer_Form {
 			$field->set_label( __( 'Reconnect all posts with Drafts in Surfer', 'surferseo' ) );
 			$field->set_hint( __( 'On click all Surfer posts connected to any draft, will be reconnected (content from WordPress will be exported to Surfer).', 'surferseo' ) );
 			$field->set_renderer( array( $this, 'render_reconnect_posts_with_drafts' ) );
-			$this->add_field( $field );
-
-			$field = new Surfer_Form_Element_Text( 'surfer_transfer_gsc_data_to_new_format' );
-			$field->set_label( __( 'Transfer GSC data to new format', 'surferseo' ) );
-			$field->set_hint( __( 'On click data from GSC will be transferred to new format.', 'surferseo' ) );
-			$field->set_renderer( array( $this, 'render_gsc_transfer' ) );
 			$this->add_field( $field );
 
 			$field = new Surfer_Form_Element_Text( 'surfer_remove_old_surfer_backups' );
@@ -499,11 +524,19 @@ class Surfer_Form_Config_Ci extends Surfer_Form {
 	 */
 	public function render_switch( $field ) {
 
+		$hint = $field->get_hint();
+
 		ob_start();
 		?>
 
 			<div class="surfer-switch-box <?php echo esc_html( $field->get_classes() ); ?>">
-				<p><?php echo wp_kses_post( $field->get_hint() ); ?></p>
+				<p>
+				<?php
+				if ( $hint ) {
+					echo wp_kses_post( $hint );
+				}
+				?>
+				</p>
 
 				<?php foreach ( $field->get_options() as $option ) : ?>
 					<?php echo esc_html( $field->get_label() ); ?>
@@ -573,31 +606,6 @@ class Surfer_Form_Config_Ci extends Surfer_Form {
 	}
 
 	/**
-	 * Renders button to test GSC connection.
-	 *
-	 * @param Surfer_Form_Element $field - field object.
-	 */
-	public function render_gsc_transfer( $field ) {
-
-		ob_start();
-		?>
-
-			<div class="surfer-gsc-transfer-data-box <?php echo esc_html( $field->get_classes() ); ?>">
-				<p><?php echo wp_kses_post( $field->get_hint() ); ?></p>
-
-				<button class="surfer-button surfer-button--secondary surfer-button--small">
-					<?php esc_html_e( 'Transfer Data', 'surferseo' ); ?>
-				</button>
-
-				<div class="surfer-gsc-transfer-data-box__result"></div>
-			</div>
-		<?php
-		$html = ob_get_clean();
-
-		echo wp_kses_post( $html );
-	}
-
-	/**
 	 * Renders button to clear backups.
 	 *
 	 * @param Surfer_Form_Element $field - field object.
@@ -644,6 +652,10 @@ class Surfer_Form_Config_Ci extends Surfer_Form {
 		if ( false === $first_enabled && $tracking_enabled ) {
 			Surfer()->get_surfer_tracking()->track_wp_environment();
 			set_transient( 'surfer_tracking_first_enabled', true, 60 * 60 * 24 * 30 );
+		}
+
+		if ( isset( $_POST['wpsurfer_api_access_key'] ) ) {
+			update_option( 'wpsurfer_api_access_key', sanitize_text_field( wp_unslash( $_POST['wpsurfer_api_access_key'] ) ) );
 		}
 
 		return $saved;

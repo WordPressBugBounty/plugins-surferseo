@@ -174,6 +174,7 @@ class Surfer_Settings {
 			'disable_elementor'                   => false,
 			'surfer_gsc_meta_script'              => false,
 			'surfer_gsc_data_collection_interval' => 7,
+			'image_processing_mode'               => 'auto',
 		);
 
 		return $defaults;

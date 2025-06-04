@@ -12,6 +12,7 @@ namespace SurferSEO\Surfer;
 
 use SurferSEO\Surferseo;
 use SurferSEO\Surfer\Content_Parsers\Parsers_Controller;
+use SurferSEO\Surfer\Surfer_Logger;
 
 
 /**
@@ -26,13 +27,20 @@ class Content_Importer {
 	 */
 	protected $content_parser = null;
 
+	/**
+	 * Object to manage image processing.
+	 *
+	 * @var Surfer_Image_Processor
+	 */
+	protected $image_processor = null;
 
 	/**
 	 * Basic construct.
 	 */
 	public function __construct() {
 
-		$this->content_parser = new Parsers_Controller();
+		$this->image_processor = new Surfer_Image_Processor();
+		$this->content_parser  = new Parsers_Controller();
 
 		add_filter( 'init', array( $this, 'register_ajax_actions' ) );
 	}
@@ -53,53 +61,138 @@ class Content_Importer {
 	 * @return int|WP_Error
 	 */
 	public function save_data_into_database( $content, $args = array() ) {
+		$logger           = Surfer()->get_surfer()->get_surfer_logger();
+		$original_content = $content;
 
-		$content = $this->content_parser->parse_content( $content );
-		$title   = isset( $args['post_title'] ) && strlen( $args['post_title'] ) > 0 ? $args['post_title'] : $this->content_parser->return_title();
+		$this->increase_limits_for_import();
 
-		$data = array(
-			'post_title'   => $title,
-			'post_content' => $content,
+		try {
+			$image_count = substr_count( $content, '<img' );
+			$this->content_parser->set_image_processing_mode( $image_count );
+
+			$content = $this->content_parser->parse_content( $content );
+			$content = $this->sanitize_content_for_database( $content );
+			$title   = isset( $args['post_title'] ) && strlen( $args['post_title'] ) > 0 ? $args['post_title'] : $this->content_parser->return_title();
+			$title   = $this->sanitize_content_for_database( $title );
+
+			$data = array(
+				'post_title'   => $title,
+				'post_content' => $content,
+			);
+
+			if ( isset( $args['post_id'] ) && $args['post_id'] > 0 ) {
+				$provided_post_id = $args['post_id'];
+				$data['ID']       = $provided_post_id;
+				$post             = (array) get_post( $provided_post_id );
+			}
+
+			$this->resolve_post_author( $args, $data );
+			$this->resolve_post_status( $args, $data );
+			$this->resolve_post_type( $args, $data );
+			$this->resolve_post_permalink( $args, $data );
+			$this->resolve_post_category( $args, $data );
+			$this->resolve_post_tags( $args, $data );
+			$this->resolve_post_meta_details( $args, $data );
+
+			if ( isset( $post ) && 'publish' === $post['post_status'] ) {
+				// WordPress set current date as default and we do not want to change publication date.
+				$data['post_date']     = $post['post_date'];
+				$data['post_date_gmt'] = $post['post_date_gmt'];
+			} else {
+				$this->resolve_post_date( $args, $data );
+			}
+
+			$post_id = wp_insert_post( $data, true );
+			if ( isset( $data['meta_input']['_aioseo_title'] ) ) {
+				$this->update_aioseo_table( $data['meta_input']['_aioseo_title'], $data['meta_input']['_aioseo_description'], $post_id );
+			}
+
+			if ( ! is_wp_error( $post_id ) && isset( $args['draft_id'] ) ) {
+				update_post_meta( $post_id, 'surfer_draft_id', $args['draft_id'] );
+				update_post_meta( $post_id, 'surfer_permalink_hash', isset( $args['permalink_hash'] ) ? $args['permalink_hash'] : '' );
+				update_post_meta( $post_id, 'surfer_keywords', $args['keywords'] );
+				update_post_meta( $post_id, 'surfer_location', $args['location'] );
+				update_post_meta( $post_id, 'surfer_scrape_ready', true );
+				update_post_meta( $post_id, 'surfer_last_post_update', round( microtime( true ) * 1000 ) );
+				update_post_meta( $post_id, 'surfer_last_post_update_direction', 'from Surfer to WordPress' );
+			}
+
+			$this->content_parser->run_after_post_insert_actions( $post_id );
+
+			$logger->log_import( $original_content, $content, true );
+			return $post_id;
+
+		} catch ( \Exception $e ) {
+			$logger->log_import( $original_content, '', null, $e->getMessage() );
+			return new \WP_Error( 'import_exception', $e->getMessage() );
+		}
+	}
+
+	/**
+	 * Increase PHP limits for import operations.
+	 *
+	 * @return void
+	 */
+	private function increase_limits_for_import() {
+		if ( ! ini_get( 'safe_mode' ) ) {
+			set_time_limit( 300 );
+		}
+
+		$current_limit = ini_get( 'memory_limit' );
+		if ( $current_limit && '-1' !== $current_limit ) {
+			$current_bytes  = $this->convert_to_bytes( $current_limit );
+			$required_bytes = 512 * 1024 * 1024;
+
+			if ( $current_bytes < $required_bytes ) {
+				wp_raise_memory_limit( '512M' );
+			}
+		}
+	}
+
+	/**
+	 * Convert memory limit string to bytes.
+	 *
+	 * @param string $limit - Memory limit string.
+	 * @return int
+	 */
+	private function convert_to_bytes( $limit ) {
+		$limit  = trim( $limit );
+		$last   = strtolower( $limit[ strlen( $limit ) - 1 ] );
+		$number = (int) $limit;
+
+		switch ( $last ) {
+			case 'g':
+				$number *= 1024 * 1024 * 1024;
+				break;
+			case 'm':
+				$number *= 1024 * 1024;
+				break;
+			case 'k':
+				$number *= 1024;
+				break;
+		}
+
+		return $number;
+	}
+
+	/**
+	 * Sanitizes content to prevent emoji-related database issues.
+	 *
+	 * @param string $content Content to sanitize.
+	 * @return string Sanitized content.
+	 */
+	private function sanitize_content_for_database( $content ) {
+		$content = wp_encode_emoji( $content );
+
+		$content = preg_replace_callback(
+			'/[\x{1F000}-\x{1F9FF}]/u',
+			function ( $match_unicode_emoji ) {
+				return '&#x' . dechex( ord( $match_unicode_emoji[0] ) ) . ';';
+			},
+			$content
 		);
 
-		if ( isset( $args['post_id'] ) && $args['post_id'] > 0 ) {
-			$provided_post_id = $args['post_id'];
-			$data['ID']       = $provided_post_id;
-			$post             = (array) get_post( $provided_post_id );
-		}
-
-		$this->resolve_post_author( $args, $data );
-		$this->resolve_post_status( $args, $data );
-		$this->resolve_post_type( $args, $data );
-		$this->resolve_post_permalink( $args, $data );
-		$this->resolve_post_category( $args, $data );
-		$this->resolve_post_tags( $args, $data );
-		$this->resolve_post_meta_details( $args, $data );
-
-		if ( isset( $post ) && 'publish' === $post['post_status'] ) {
-			// WordPress set current date as default and we do not want to change publication date.
-			$data['post_date']     = $post['post_date'];
-			$data['post_date_gmt'] = $post['post_date_gmt'];
-		} else {
-			$this->resolve_post_date( $args, $data );
-		}
-
-		$post_id = wp_insert_post( $data, true );
-		$this->update_aioseo_table( $data['meta_input']['_aioseo_title'], $data['meta_input']['_aioseo_description'], $post_id );
-
-		if ( ! is_wp_error( $post_id ) && isset( $args['draft_id'] ) ) {
-			update_post_meta( $post_id, 'surfer_draft_id', $args['draft_id'] );
-			update_post_meta( $post_id, 'surfer_permalink_hash', isset( $args['permalink_hash'] ) ? $args['permalink_hash'] : '' );
-			update_post_meta( $post_id, 'surfer_keywords', $args['keywords'] );
-			update_post_meta( $post_id, 'surfer_location', $args['location'] );
-			update_post_meta( $post_id, 'surfer_scrape_ready', true );
-			update_post_meta( $post_id, 'surfer_last_post_update', round( microtime( true ) * 1000 ) );
-			update_post_meta( $post_id, 'surfer_last_post_update_direction', 'from Surfer to WordPress' );
-		}
-
-		$this->content_parser->run_after_post_insert_actions( $post_id );
-
-		return $post_id;
+		return $content;
 	}
 
 	/**
@@ -422,7 +515,7 @@ class Content_Importer {
 			$chosen_seo_plugin = $this->find_active_seo_plugin();
 		}
 
-		if ( 'aioseo' != $chosen_seo_plugin ) {
+		if ( 'aioseo' !== $chosen_seo_plugin ) {
 			return;
 		}
 
