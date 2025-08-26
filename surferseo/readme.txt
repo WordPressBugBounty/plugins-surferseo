@@ -4,7 +4,7 @@ Tags: seo, keywords, content writing, content, keyword research
 Requires at least: 6.0
 Requires PHP: 7.4
 Tested up to: 6.8
-Stable tag: 1.6.4.574
+Stable tag: 1.6.5.584
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -87,6 +87,11 @@ It is not a bug, it is a feature. ;)
 4. Select prewritten, drafted, pending, future, and published content  and export it to WordPress with just a few clicks.
 
 == Changelog ==
+
+= 1.6.5 =
+* FEATURE: New filters to allow customized content parsing
+* FIX: Security improvements
+* FIX: Other small fixes & typos
 
 = 1.6.4 =
 * FEATURE: Introduce async image loading
@@ -233,6 +238,9 @@ It is not a bug, it is a feature. ;)
 * FEATURE: Export content from Surfer Content Editor to WordPress.
 
 == Upgrade Notice ==
+
+= 1.6.4 =
+Security improvements and new content parsing hooks
 
 = 1.6.4 =
 Async images download - for content editors with multiple images

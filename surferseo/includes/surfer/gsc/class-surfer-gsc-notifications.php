@@ -43,6 +43,11 @@ class Surfer_GSC_Notifications {
 			return;
 		}
 
+		$dismiss_url = wp_nonce_url(
+			add_query_arg( 'surfer-dismiss-and-save', 'gsc_question' ),
+			'surfer_dismiss_notification'
+		);
+
 		$dismissals = (array) get_option( 'surfer_notification_dismissals' );
 
 		?>
@@ -58,7 +63,7 @@ class Surfer_GSC_Notifications {
 
 					<?php esc_html_e( 'Yes, I want to measure my website performance', 'surferseo' ); ?>
 				</a>
-				<a href="<?php echo esc_url( admin_url( sprintf( 'index.php?%s', http_build_query( array_merge( $_GET, array( 'surfer-dismiss-and-save' => 'gsc_question' ) ) ) ) ) ); ?>" class="surfer-button surfer-button--secondary surfer-button--small surfer-button--icon-left">
+				<a href="<?php echo esc_url( $dismiss_url ); ?>" class="surfer-button surfer-button--secondary surfer-button--small surfer-button--icon-left">
 					<svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
 						<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
 					</svg>
@@ -97,7 +102,7 @@ class Surfer_GSC_Notifications {
 
 					<?php esc_html_e( 'I want to check my site\'s performance', 'surferseo' ); ?>
 				</a>
-				<?php if ( ! $this->performance_report_email_notification_endabled() ) : ?>
+				<?php if ( ! $this->performance_report_email_notification_enabled() ) : ?>
 				<a href="<?php echo esc_url( admin_url( 'index.php?page=surfer&surfer_enable_email_notification=1' ) ); ?>" class="surfer-button surfer-button--secondary surfer-button--small surfer-button--icon-left surfer-analytics" data-event-name="banner_gsc_emails" data-event-data="show_results">
 					<svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
 						<path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
@@ -120,10 +125,17 @@ class Surfer_GSC_Notifications {
 	 * @return void
 	 */
 	public function save_enable_email_performance_report() {
-		if ( isset( $_GET['surfer_enable_email_notification'] ) && 1 === (int) $_GET['surfer_enable_email_notification'] ) {
-			Surfer()->get_surfer_settings()->save_option( 'content-importer', 'surfer_position_monitor_summary', true );
-			wp_safe_redirect( admin_url( 'admin.php?page=surfer#header_position_monitor' ) );
-			exit;
+
+		if ( ! isset( $_GET['surfer_enable_email_notification'] ) || ! current_user_can( 'manage_options' ) ) {
+			return;
 		}
+
+		if ( ! isset( $_GET['_wpnonce'] ) || ! wp_verify_nonce( $_GET['_wpnonce'], 'surfer_dismiss_notification' ) ) {
+			return;
+		}
+
+		Surfer()->get_surfer_settings()->save_option( 'content-importer', 'surfer_position_monitor_summary', true );
+		wp_safe_redirect( admin_url( 'admin.php?page=surfer#header_position_monitor' ) );
+		exit;
 	}
 }

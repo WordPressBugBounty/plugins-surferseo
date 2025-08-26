@@ -392,7 +392,7 @@ class Surfer_Admin {
 		$content .= 'GSC DATA INTERVAL: ' . $interval . PHP_EOL . PHP_EOL;
 		$content .= 'LAST GSC DATA GATHERING: ' . get_option( 'surfer_last_gsc_data_update', false ) . PHP_EOL . PHP_EOL;
 		$content .= 'NEXT GSC DATA GATHERING: ' . wp_next_scheduled( 'surfer_gather_drop_monitor_data' ) . PHP_EOL . PHP_EOL;
-		$content .= 'E-MAIL NOTIFICATION ENABLED: ' . Surfer()->get_surfer()->get_gsc()->performance_report_email_notification_endabled() . PHP_EOL . PHP_EOL;
+		$content .= 'E-MAIL NOTIFICATION ENABLED: ' . Surfer()->get_surfer()->get_gsc()->performance_report_email_notification_enabled() . PHP_EOL . PHP_EOL;
 		$content .= 'E-MAIL SENT IN LAST 7 days: ' . get_transient( 'surfer_gsc_weekly_report_email_sent' ) . PHP_EOL . PHP_EOL;
 		$content .= 'SURFER VERSION OPTION: ' . get_option( 'surfer_version', false ) . PHP_EOL . PHP_EOL;
 		$content .= 'SURFER VERSION NOW: ' . SURFER_VERSION . PHP_EOL . PHP_EOL;

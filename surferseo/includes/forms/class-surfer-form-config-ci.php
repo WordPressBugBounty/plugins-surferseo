@@ -672,7 +672,7 @@ class Surfer_Form_Config_Ci extends Surfer_Form {
 		$emails   = isset( $_POST['surfer_position_monitor_summary'] ) ? wp_unslash( $_POST['surfer_position_monitor_summary'] ) : false;
 
 		$tracking_current_state = Surfer()->get_surfer_tracking()->is_tracking_allowed();
-		$emails_current_state   = $this->performance_report_email_notification_endabled();
+		$emails_current_state   = $this->performance_report_email_notification_enabled();
 
 		return array(
 			'tracking' => array(

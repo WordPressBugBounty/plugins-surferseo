@@ -52,10 +52,17 @@ class Parsers_Controller {
 
 		set_time_limit( 120 );
 
-		$this->choose_parser();
-		$parsed_content = $this->chosen_parser->parse_content( $content );
+		$content        = apply_filters( 'surfer_pre_import_content_parsing', $content );
+		$parsed_content = '';
 
-		return apply_filters( 'surfer_import_content_parsing', $parsed_content );
+		if ( apply_filters( 'surfer_skip_default_content_parsing', false ) ) {
+			$parsed_content = $content;
+		} else {
+			$this->choose_parser();
+			$parsed_content = $this->chosen_parser->parse_content( $content );
+		}
+
+		return apply_filters( 'surfer_import_content_parsing', $parsed_content, $content );
 	}
 
 	/**

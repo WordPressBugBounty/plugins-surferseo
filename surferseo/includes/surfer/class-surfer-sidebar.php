@@ -11,7 +11,7 @@ namespace SurferSEO\Surfer;
 use SurferSEO\Surferseo;
 
 /**
- * Object responsible for handlig Surfer sidebar.
+ * Object responsible for handling Surfer sidebar.
  */
 class Surfer_Sidebar {
 
@@ -55,12 +55,12 @@ class Surfer_Sidebar {
 
 		$allowed_post_types = surfer_return_supported_post_types();
 
-		// Add meta box only in classic editor (in Gutenber we have sidebar).
+		// Add meta box only in classic editor (in Gutenberg we have sidebar).
 		if ( ! $current_screen->is_block_editor() ) {
 			add_meta_box(
 				'surfer_export_content',
 				__( 'Optimize', 'surferseo' ),
-				array( $this, 'render_contet_export_box' ),
+				array( $this, 'render_content_export_box' ),
 				$allowed_post_types,
 				'side',
 				'default'
@@ -73,7 +73,7 @@ class Surfer_Sidebar {
 	 *
 	 * @return void
 	 */
-	public function render_contet_export_box() {
+	public function render_content_export_box() {
 
 		?>
 			<div key="surfer-guidelines" id="surfer-content-export-box"></div>

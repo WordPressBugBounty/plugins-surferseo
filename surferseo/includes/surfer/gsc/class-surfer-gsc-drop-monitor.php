@@ -286,7 +286,7 @@ class Surfer_GSC_Drop_Monitor {
 	 */
 	private function send_performance_report_email() {
 
-		if ( ! $this->performance_report_email_notification_endabled() ) {
+		if ( ! $this->performance_report_email_notification_enabled() ) {
 			return;
 		}
 

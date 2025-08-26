@@ -67,7 +67,7 @@ trait Surfer_GSC_Common {
 	 *
 	 * @return bool
 	 */
-	public function performance_report_email_notification_endabled() {
+	public function performance_report_email_notification_enabled() {
 
 		$notification_enabled = Surfer()->get_surfer_settings()->get_option( 'content-importer', 'surfer_position_monitor_summary', false );
 

@@ -11,7 +11,7 @@ namespace SurferSEO\Surfer;
 use SurferSEO\Surferseo;
 
 /**
- * Object responsible for handlig tracking functions
+ * Object responsible for handling tracking functions
  */
 class Surfer_Tracking {
 
@@ -30,7 +30,7 @@ class Surfer_Tracking {
 	 */
 	public function init() {
 		add_action( 'admin_notices', array( $this, 'notify_tracking_question' ) );
-		add_action( 'admin_init', array( $this, 'save_dismission_of_surfer_notification' ) );
+		add_action( 'admin_init', array( $this, 'save_dismissal_of_surfer_notification' ) );
 		add_action( 'admin_init', array( $this, 'save_permission_allowed' ) );
 
 		add_action( 'wp_ajax_surfer_track_keyword_research_usage', array( $this, 'track_keyword_research_usage' ) );
@@ -70,6 +70,16 @@ class Surfer_Tracking {
 			return;
 		}
 
+		$dismiss_url = wp_nonce_url(
+			add_query_arg( 'surfer-dismiss-and-save', 'tracking_question' ),
+			'surfer_dismiss_notification'
+		);
+
+		$permission_allowed_url = wp_nonce_url(
+			add_query_arg( 'surfer_enable_tracking', '1' ),
+			'surfer_dismiss_notification'
+		);
+
 		$dismissals = (array) get_option( 'surfer_notification_dismissals' );
 
 		?>
@@ -83,14 +93,14 @@ class Surfer_Tracking {
 				<p><?php printf( wp_kses_post( __( 'Don\'t worry! You can turn off this feature at any time in <a href="%s">Surfer’s WordPress plugin settings</a>.', 'surferseo' ) ), esc_url( admin_url( 'admin.php?page=surfer' ) ) ); ?></p>
 			</span>
 			<span class="surfer-notice_action_buttons">
-				<a href="<?php echo esc_url( admin_url( 'admin.php?page=surfer&surfer_enable_tracking=1' ) ); ?>" class="surfer-button surfer-button--primary surfer-button--small surfer-button--icon-left surfer-analytics" data-event-name="banner_enable_tracking" data-event-data="tracking_enabled" data-tracking-enabling="true" >
+				<a href="<?php echo esc_url( $permission_allowed_url ); ?>" class="surfer-button surfer-button--primary surfer-button--small surfer-button--icon-left surfer-analytics" data-event-name="banner_enable_tracking" data-event-data="tracking_enabled" data-tracking-enabling="true" >
 					<svg xmlns="http://www.w3.org/2000/svg" width="20" height="21" viewBox="0 0 20 21" fill="currentColor">
 						<path fill-rule="evenodd" clip-rule="evenodd" d="M16.7045 4.43777C17.034 4.6888 17.0976 5.1594 16.8466 5.48887L8.84657 15.9889C8.71541 16.161 8.51627 16.2681 8.30033 16.2827C8.08439 16.2972 7.87271 16.2177 7.71967 16.0647L3.21967 11.5647C2.92678 11.2718 2.92678 10.7969 3.21967 10.504C3.51256 10.2111 3.98744 10.2111 4.28033 10.504L8.17351 14.3972L15.6534 4.57981C15.9045 4.25033 16.3751 4.18674 16.7045 4.43777Z" fill="white"/>
 					</svg>
 
 					<?php esc_html_e( 'Allow us to analyze usage data ', 'surferseo' ); ?>
 				</a>
-				<a href="<?php echo esc_url( admin_url( sprintf( 'index.php?%s', http_build_query( array_merge( $_GET, array( 'surfer-dismiss-and-save' => 'tracking_question' ) ) ) ) ) ); ?>" class="surfer-button surfer-button--secondary surfer-button--small surfer-button--icon-left">
+				<a href="<?php echo esc_url( $dismiss_url ); ?>" class="surfer-button surfer-button--secondary surfer-button--small surfer-button--icon-left">
 					<svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
 						<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
 					</svg>
@@ -104,22 +114,32 @@ class Surfer_Tracking {
 	}
 
 	/**
-	 * Save the dismission of the tracking question.
+	 * Save the dismissal of the tracking question.
 	 *
 	 * @return void
 	 */
-	public function save_dismission_of_surfer_notification() {
-		if ( isset( $_GET['surfer-dismiss-and-save'] ) ) {
-			$dismissals = get_option( 'surfer_notification_dismissals' );
-
-			if ( ! is_array( $dismissals ) ) {
-				$dismissals = array();
-			}
-
-			$dismissals[] = sanitize_text_field( wp_unslash( $_GET['surfer-dismiss-and-save'] ) );
-
-			update_option( 'surfer_notification_dismissals', $dismissals );
+	public function save_dismissal_of_surfer_notification() {
+		if ( ! isset( $_GET['surfer-dismiss-and-save'] ) || ! current_user_can( 'manage_options' ) ) {
+			return;
 		}
+
+		if ( ! isset( $_GET['_wpnonce'] ) || ! wp_verify_nonce( $_GET['_wpnonce'], 'surfer_dismiss_notification' ) ) {
+			return;
+		}
+
+		$dismissals = get_option( 'surfer_notification_dismissals' );
+
+		if ( ! is_array( $dismissals ) ) {
+			$dismissals = array();
+		}
+
+		$dismissals[] = sanitize_text_field( wp_unslash( $_GET['surfer-dismiss-and-save'] ) );
+
+		update_option( 'surfer_notification_dismissals', $dismissals );
+
+		$redirect_url = remove_query_arg( array( 'surfer-dismiss-and-save', '_wpnonce' ) );
+		wp_safe_redirect( $redirect_url );
+		exit;
 	}
 
 	/**
@@ -128,11 +148,22 @@ class Surfer_Tracking {
 	 * @return void
 	 */
 	public function save_permission_allowed() {
-		if ( isset( $_GET['surfer_enable_tracking'] ) && 1 === (int) $_GET['surfer_enable_tracking'] ) {
-			Surfer()->get_surfer_settings()->save_option( 'content-importer', 'surfer_tracking_enabled', true );
-			wp_safe_redirect( admin_url( 'admin.php?page=surfer#header_tracking' ) );
-			exit;
+
+		if ( ! isset( $_GET['surfer_enable_tracking'] ) || ! current_user_can( 'manage_options' ) ) {
+			return;
 		}
+
+		if ( ! isset( $_GET['_wpnonce'] ) || ! wp_verify_nonce( $_GET['_wpnonce'], 'surfer_dismiss_notification' ) ) {
+			return;
+		}
+
+		if ( 1 !== (int) $_GET['surfer_enable_tracking'] ) {
+			return;
+		}
+
+		Surfer()->get_surfer_settings()->save_option( 'content-importer', 'surfer_tracking_enabled', true );
+		wp_safe_redirect( admin_url( 'admin.php?page=surfer#header_tracking' ) );
+		exit;
 	}
 
 	/**
@@ -196,7 +227,7 @@ class Surfer_Tracking {
 			// Surfer specific data.
 			'surfer_version'            => SURFER_VERSION,
 			'surfer_gsc_is_hidden'      => Surfer()->get_surfer()->get_gsc()->check_if_admin_hide_gsc_column(),
-			'surfer_email_notification' => Surfer()->get_surfer()->get_gsc()->performance_report_email_notification_endabled(),
+			'surfer_email_notification' => Surfer()->get_surfer()->get_gsc()->performance_report_email_notification_enabled(),
 		);
 	}
 

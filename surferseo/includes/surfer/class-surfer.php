@@ -1260,7 +1260,7 @@ class Surfer {
 				// Surfer connection details.
 				'api_key'                => get_option( 'wpsurfer_api_access_key', null ),
 				'connected'              => Surfer()->get_surfer()->is_surfer_connected(),
-				'emails_enabled'         => Surfer()->get_surfer()->get_gsc()->performance_report_email_notification_endabled(),
+				'emails_enabled'         => Surfer()->get_surfer()->get_gsc()->performance_report_email_notification_enabled(),
 				// Surfer post details.
 				'default_draft_id'       => get_post_meta( get_the_ID(), 'surfer_draft_id', true ),
 				'default_permalink_hash' => get_post_meta( get_the_ID(), 'surfer_permalink_hash', true ),

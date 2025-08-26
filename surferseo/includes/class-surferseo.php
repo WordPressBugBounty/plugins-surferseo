@@ -250,15 +250,6 @@ class Surferseo {
 	}
 
 	/**
-	 * Loads textdomain for translation.
-	 *
-	 * @return void
-	 */
-	public function load_text_domain() {
-		load_plugin_textdomain( 'surferseo', false, plugin_basename( __DIR__ ) );
-	}
-
-	/**
 	 * Function that includes all required classes.
 	 *
 	 * @return void
