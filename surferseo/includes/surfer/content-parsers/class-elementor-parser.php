@@ -8,6 +8,10 @@
 
 namespace SurferSEO\Surfer\Content_Parsers;
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 use DOMDocument;
 use Elementor\Frontend;
 
@@ -32,7 +36,7 @@ class Elementor_Parser extends Content_Parser {
 
 
 	/**
-	 * Parse images for classic editor.
+	 * Parse images for elementor.
 	 *
 	 * @param string $content - whole content.
 	 * @return string content where <img> URLs are corrected to media library.
@@ -94,8 +98,6 @@ class Elementor_Parser extends Content_Parser {
 		$utf8_fix_suffix = '</body></html>';
 
 		$doc->loadHTML( $utf8_fix_prefix . $content . $utf8_fix_suffix, LIBXML_HTML_NODEFDTD | LIBXML_SCHEMA_CREATE );
-
-		$doc = $this->remove_p_from_lists( $doc );
 
 		$settings                 = new \stdClass();
 		$settings->flex_direction = 'column';
@@ -474,7 +476,7 @@ class Elementor_Parser extends Content_Parser {
 	}
 
 	/**
-	 * Functions prepare attributes for HTML and Gutendber tags.
+	 * Functions prepare attributes for HTML and Gutenberg tags.
 	 *
 	 * @param DOMElement $node - node to parse.
 	 * @return array
@@ -539,39 +541,5 @@ class Elementor_Parser extends Content_Parser {
 		}
 
 		return $attributes;
-	}
-
-		/**
-		 * Remove <p> tags from lists.
-		 *
-		 * @param DOMDocument $doc - DOM document.
-		 * @return DOMDocument
-		 */
-	private function remove_p_from_lists( $doc ) {
-		$list_items = $doc->getElementsByTagName( 'li' );
-
-		$li_array = array();
-		foreach ( $list_items as $li ) {
-			$li_array[] = $li;
-		}
-
-		foreach ( $li_array as $li ) {
-			$paragraphs = $li->getElementsByTagName( 'p' );
-
-			$p_array = array();
-			foreach ( $paragraphs as $p ) {
-				$p_array[] = $p;
-			}
-
-			foreach ( $p_array as $p ) {
-				while ( $p->firstChild ) { // phpcs:ignore
-					$li->insertBefore( $p->firstChild, $p ); // phpcs:ignore
-				}
-
-				$li->removeChild( $p );
-			}
-		}
-
-		return $doc;
 	}
 }

@@ -8,6 +8,10 @@
 
 namespace SurferSEO;
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 /**
  * Object to manage SEO related features, but not connected to Surfer directly.
  */

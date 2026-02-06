@@ -9,6 +9,9 @@
 
 namespace SurferSEO\Upgrade;
 
+
+if ( ! defined( 'ABSPATH' ) ) exit;
+
 /**
  * Abstract class to define DB updates
  */

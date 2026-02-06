@@ -7,6 +7,10 @@
 
 namespace SurferSEO\Surfer\GSC;
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 use stdClass;
 
 /**
@@ -73,15 +77,6 @@ class Surfer_GSC_Drop_Monitor {
 			return 'No records for this domain in last week in GSC.';
 		}
 
-		$debug_log = array(
-			'execution_time'            => gmdate( 'Y-m-d H:i:s' ),
-			'posts_max'                 => $posts_max,
-			'posts_done_before'         => $posts_done,
-			'last_gathering_date'       => get_option( 'surfer_last_gsc_data_update', strtotime( 'this week monday' ) ),
-			'query_last_gathering_date' => gmdate( 'Y-m-d 00:00:00', strtotime( get_option( 'surfer_last_gsc_data_update', strtotime( 'this week monday' ) ) ) ),
-			'posts'                     => array(),
-		);
-
 		// Process is done.
 		if ( $posts_done >= $posts_max ) {
 			delete_transient( 'surfer_gsc_data_collection_posts_done' );
@@ -109,19 +104,12 @@ class Surfer_GSC_Drop_Monitor {
 				$can_parse = $this->can_parse_data( $page );
 
 				if ( true !== $can_parse ) {
-					$debug_log['posts'][ $i ] = $can_parse;
 					continue;
 				}
 
-				$db_insert                = $this->parse_single_page_data( $page );
-				$debug_log['posts'][ $i ] = $db_insert;
+				$this->parse_single_page_data( $page );
 			}
 		}
-
-		$debug_log['posts_done_after_cycle'] = $posts_done;
-		$debug_log['return']                 = $return;
-
-		return print_r( $debug_log, true );
 	}
 
 	/**
@@ -196,7 +184,19 @@ class Surfer_GSC_Drop_Monitor {
 	 */
 	private function get_last_period_date( $post_id ) {
 		global $wpdb;
-		$records = $wpdb->get_row( $wpdb->prepare( 'SELECT p.data_gathering_date FROM ' . $wpdb->prefix . 'surfer_gsc_traffic AS p WHERE p.post_id = %d ORDER BY p.data_gathering_date DESC LIMIT 1', $post_id ), ARRAY_A );
+		$cache_key = 'gsc_last_period_date_' . absint( $post_id );
+		$records   = wp_cache_get( $cache_key, 'surferseo_db' );
+
+		if ( false === $records ) {
+			$records = $wpdb->get_row(
+				$wpdb->prepare(
+					'SELECT p.data_gathering_date FROM ' . $wpdb->prefix . 'surfer_gsc_traffic AS p WHERE p.post_id = %d ORDER BY p.data_gathering_date DESC LIMIT 1',
+					$post_id
+				),
+				ARRAY_A
+			);
+			wp_cache_set( $cache_key, $records, 'surferseo_db', 5 * MINUTE_IN_SECONDS );
+		}
 
 		if ( isset( $records ) && $records ) {
 			return $records['data_gathering_date'];
@@ -246,9 +246,9 @@ class Surfer_GSC_Drop_Monitor {
 	 */
 	public function test_gather_position_monitor_data() {
 
-		if ( ! surfer_validate_ajax_request() ) {
+		if ( ! surfer_validate_ajax_request() || ! check_ajax_referer( 'surfer-ajax-nonce', '_surfer_nonce', false ) ) {
 			echo wp_json_encode( array( 'message' => 'Security check failed.' ) );
-			wp_die();
+			return;
 		}
 
 		$this->gather_position_monitor_data();
@@ -261,7 +261,7 @@ class Surfer_GSC_Drop_Monitor {
 
 		if ( ! Surfer()->get_surfer()->get_gsc()->check_if_gsc_connected( true ) ) {
 			echo wp_json_encode( 'GSC not connected' );
-			wp_die();
+			return;
 		}
 
 		$return = $this->get_posts_from_gsc( $this->max_gsc_rows, 0 );
@@ -270,15 +270,8 @@ class Surfer_GSC_Drop_Monitor {
 			$number_of_posts = count( $return['response']['traffic_data'] );
 			set_transient( 'surfer_gsc_data_collection_posts_max', $number_of_posts, HOUR_IN_SECONDS * 1 );
 
-			$results = $this->parse_data_bunch_for_position_monitor();
-
-			echo wp_json_encode( $results );
-			wp_die();
+			$this->parse_data_bunch_for_position_monitor();
 		}
-
-		// We have this print for debug.
-		echo wp_json_encode( print_r( $return, true ) );
-		wp_die();
 	}
 
 	/**
@@ -314,6 +307,10 @@ class Surfer_GSC_Drop_Monitor {
 	 */
 	public function test_performance_email_template() {
 
+		if ( ! isset( $_GET['_wpnonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ) ), 'surfer_send_test_performance_email' ) ) {
+			return false;
+		}
+
 		if ( ! current_user_can( 'manage_options' ) ) {
 			return false;
 		}
@@ -328,8 +325,10 @@ class Surfer_GSC_Drop_Monitor {
 
 		echo $message; //@PHPCS:ignore:WordPress.Security.EscapeOutput.OutputNotEscaped
 
-		if ( isset( $_GET['send_email'] ) && is_email( sanitize_email( wp_unslash( $_GET['send_email'] ) ) ) ) {
-			wp_mail( sanitize_email( wp_unslash( $_GET['send_email'] ) ), $title, $message, $headers );
+		$send_email = isset( $_GET['send_email'] ) ? sanitize_email( wp_unslash( $_GET['send_email'] ) ) : '';
+
+		if ( $send_email && is_email( $send_email ) ) {
+			wp_mail( $send_email, $title, $message, $headers );
 		}
 
 		wp_die();
@@ -394,19 +393,25 @@ class Surfer_GSC_Drop_Monitor {
 		global $wpdb;
 
 		// position_change DESC because we want biggest fall on top, and fall is represented by positive numbers.
-		$posts = $wpdb->get_results(
-			$wpdb->prepare(
-				'SELECT * FROM ' . $wpdb->prefix . 'surfer_gsc_traffic AS t
-				LEFT JOIN ' . $wpdb->prefix . 'posts AS p ON t.post_id = p.ID
-				WHERE ( t.position - t.position_change ) <= 10 
-				AND ( t.position - t.position_change ) > 0 
-				AND t.position_change > 0 
-				AND t.data_gathering_date = ( SELECT MAX(data_gathering_date) FROM ' . $wpdb->prefix . 'surfer_gsc_traffic AS t2 WHERE t.post_id = t2.post_id )
-				AND t.data_gathering_date >= %s
-				ORDER BY t.position_change DESC',
-				$query_last_date
-			)
-		);
+		$cache_key = 'gsc_posts_drops_top10_' . md5( (string) $query_last_date );
+		$posts     = wp_cache_get( $cache_key, 'surferseo_db' );
+
+		if ( false === $posts ) {
+			$posts = $wpdb->get_results(
+				$wpdb->prepare(
+					'SELECT * FROM ' . $wpdb->prefix . 'surfer_gsc_traffic AS t
+			LEFT JOIN ' . $wpdb->prefix . 'posts AS p ON t.post_id = p.ID
+			WHERE ( t.position - t.position_change ) <= 10 
+			AND ( t.position - t.position_change ) > 0 
+			AND t.position_change > 0 
+			AND t.data_gathering_date = ( SELECT MAX(data_gathering_date) FROM ' . $wpdb->prefix . 'surfer_gsc_traffic AS t2 WHERE t.post_id = t2.post_id )
+			AND t.data_gathering_date >= %s
+			ORDER BY t.position_change DESC',
+					$query_last_date
+				)
+			);
+			wp_cache_set( $cache_key, $posts, 'surferseo_db', 5 * MINUTE_IN_SECONDS );
+		}
 
 		return $posts;
 	}
@@ -430,21 +435,27 @@ class Surfer_GSC_Drop_Monitor {
 		global $wpdb;
 
 		// position_change DESC because we want biggest fall on top, and fall is represented by positive numbers.
-		$posts = $wpdb->get_results(
-			$wpdb->prepare(
-				'SELECT * FROM ' . $wpdb->prefix . 'surfer_gsc_traffic AS t
-				LEFT JOIN ' . $wpdb->prefix . 'posts AS p ON t.post_id = p.ID
-				WHERE 
-				  (t.position - t.position_change) <= 50 
-				  AND (t.position - t.position_change) > 10
-				  AND t.position_change > 0
-				  AND t.position / 10 <> (t.position - t.position_change) / 10
-				  AND t.data_gathering_date = ( SELECT MAX(data_gathering_date) FROM ' . $wpdb->prefix . 'surfer_gsc_traffic AS t2 WHERE t.post_id = t2.post_id )
-				  AND t.data_gathering_date >= %s
-				ORDER BY t.position_change DESC',
-				$query_last_date
-			)
-		);
+		$cache_key = 'gsc_posts_drops_next10_' . md5( (string) $query_last_date );
+		$posts     = wp_cache_get( $cache_key, 'surferseo_db' );
+
+		if ( false === $posts ) {
+			$posts = $wpdb->get_results(
+				$wpdb->prepare(
+					'SELECT * FROM ' . $wpdb->prefix . 'surfer_gsc_traffic AS t
+			LEFT JOIN ' . $wpdb->prefix . 'posts AS p ON t.post_id = p.ID
+			WHERE 
+			  (t.position - t.position_change) <= 50 
+			  AND (t.position - t.position_change) > 10
+			  AND t.position_change > 0
+			  AND t.position / 10 <> (t.position - t.position_change) / 10
+			  AND t.data_gathering_date = ( SELECT MAX(data_gathering_date) FROM ' . $wpdb->prefix . 'surfer_gsc_traffic AS t2 WHERE t.post_id = t2.post_id )
+			  AND t.data_gathering_date >= %s
+			ORDER BY t.position_change DESC',
+					$query_last_date
+				)
+			);
+			wp_cache_set( $cache_key, $posts, 'surferseo_db', 5 * MINUTE_IN_SECONDS );
+		}
 
 		return $posts;
 	}
@@ -468,20 +479,26 @@ class Surfer_GSC_Drop_Monitor {
 		global $wpdb;
 
 		// Order by position_change ASC - smaller change, means that post was on higher position and they are more important for us. Changes are positive numbers. (POSITION - CHANGE) = 0.
-		$posts = $wpdb->get_results(
-			$wpdb->prepare(
-				'SELECT * FROM ' . $wpdb->prefix . 'surfer_gsc_traffic AS t
-				LEFT JOIN ' . $wpdb->prefix . 'posts AS p ON t.post_id = p.ID
-				WHERE 
-				  t.position = 0
-				  AND t.position_change IS NOT NULL
-				  AND t.position_change <> 0
-				  AND t.data_gathering_date = ( SELECT MAX(data_gathering_date) FROM ' . $wpdb->prefix . 'surfer_gsc_traffic AS t2 WHERE t.post_id = t2.post_id )
-				  AND t.data_gathering_date >= %s
-				ORDER BY t.position_change ASC',
-				$query_last_date
-			)
-		);
+		$cache_key = 'gsc_posts_out_of_index_' . md5( (string) $query_last_date );
+		$posts     = wp_cache_get( $cache_key, 'surferseo_db' );
+
+		if ( false === $posts ) {
+			$posts = $wpdb->get_results(
+				$wpdb->prepare(
+					'SELECT * FROM ' . $wpdb->prefix . 'surfer_gsc_traffic AS t
+			LEFT JOIN ' . $wpdb->prefix . 'posts AS p ON t.post_id = p.ID
+			WHERE 
+			  t.position = 0
+			  AND t.position_change IS NOT NULL
+			  AND t.position_change <> 0
+			  AND t.data_gathering_date = ( SELECT MAX(data_gathering_date) FROM ' . $wpdb->prefix . 'surfer_gsc_traffic AS t2 WHERE t.post_id = t2.post_id )
+			  AND t.data_gathering_date >= %s
+			ORDER BY t.position_change ASC',
+					$query_last_date
+				)
+			);
+			wp_cache_set( $cache_key, $posts, 'surferseo_db', 5 * MINUTE_IN_SECONDS );
+		}
 
 		return $posts;
 	}
@@ -505,20 +522,26 @@ class Surfer_GSC_Drop_Monitor {
 		global $wpdb;
 
 		// Order by position_change DESC - smaller change, means that post was indexed on higher position. Changes will be negative numbers POSITION = (0 - CHANGE).
-		$posts = $wpdb->get_results(
-			$wpdb->prepare(
-				'SELECT * FROM ' . $wpdb->prefix . 'surfer_gsc_traffic AS t
-				LEFT JOIN ' . $wpdb->prefix . 'posts AS p ON t.post_id = p.ID
-				WHERE 
-				  t.position = ABS(t.position_change)
-				  AND t.position_change IS NOT NULL
-				  AND t.position_change <> 0
-				  AND t.data_gathering_date = ( SELECT MAX(data_gathering_date) FROM ' . $wpdb->prefix . 'surfer_gsc_traffic AS t2 WHERE t.post_id = t2.post_id )
-				  AND t.data_gathering_date >= %s
-				ORDER BY t.position_change DESC',
-				$query_last_date
-			)
-		);
+		$cache_key = 'gsc_indexed_posts_' . md5( (string) $query_last_date );
+		$posts     = wp_cache_get( $cache_key, 'surferseo_db' );
+
+		if ( false === $posts ) {
+			$posts = $wpdb->get_results(
+				$wpdb->prepare(
+					'SELECT * FROM ' . $wpdb->prefix . 'surfer_gsc_traffic AS t
+			LEFT JOIN ' . $wpdb->prefix . 'posts AS p ON t.post_id = p.ID
+			WHERE 
+			  t.position = ABS(t.position_change)
+			  AND t.position_change IS NOT NULL
+			  AND t.position_change <> 0
+			  AND t.data_gathering_date = ( SELECT MAX(data_gathering_date) FROM ' . $wpdb->prefix . 'surfer_gsc_traffic AS t2 WHERE t.post_id = t2.post_id )
+			  AND t.data_gathering_date >= %s
+			ORDER BY t.position_change DESC',
+					$query_last_date
+				)
+			);
+			wp_cache_set( $cache_key, $posts, 'surferseo_db', 5 * MINUTE_IN_SECONDS );
+		}
 
 		return $posts;
 	}
@@ -541,23 +564,29 @@ class Surfer_GSC_Drop_Monitor {
 		global $wpdb;
 
 		// position_change ASC because we want biggest growth on top, and growth is represented by negative numbers.
-		$posts = $wpdb->get_results(
-			$wpdb->prepare(
-				'SELECT * FROM ' . $wpdb->prefix . 'surfer_gsc_traffic AS t
-				LEFT JOIN ' . $wpdb->prefix . 'posts AS p ON t.post_id = p.ID
-				LEFT JOIN ' . $wpdb->prefix . 'postmeta AS meta ON p.ID = meta.post_id AND meta.meta_key = "surfer_draft_id"
-				WHERE 
-				  ( t.position + t.position_change ) < 50
-				  AND t.position > 0
-				  AND t.position_change IS NOT NULL
-				  AND t.position_change < -1
-				  AND meta.meta_value IS NOT NULL
-				  AND t.data_gathering_date = ( SELECT MAX(data_gathering_date) FROM ' . $wpdb->prefix . 'surfer_gsc_traffic AS t2 WHERE t.post_id = t2.post_id )
-				  AND t.data_gathering_date >= %s
-				ORDER BY t.position_change ASC',
-				$query_last_date
-			)
-		);
+		$cache_key = 'gsc_posts_grew_' . md5( (string) $query_last_date );
+		$posts     = wp_cache_get( $cache_key, 'surferseo_db' );
+
+		if ( false === $posts ) {
+			$posts = $wpdb->get_results(
+				$wpdb->prepare(
+					'SELECT * FROM ' . $wpdb->prefix . 'surfer_gsc_traffic AS t
+			LEFT JOIN ' . $wpdb->prefix . 'posts AS p ON t.post_id = p.ID
+			LEFT JOIN ' . $wpdb->prefix . 'postmeta AS meta ON p.ID = meta.post_id AND meta.meta_key = "surfer_draft_id"
+			WHERE 
+			  ( t.position + t.position_change ) < 50
+			  AND t.position > 0
+			  AND t.position_change IS NOT NULL
+			  AND t.position_change < -1
+			  AND meta.meta_value IS NOT NULL
+			  AND t.data_gathering_date = ( SELECT MAX(data_gathering_date) FROM ' . $wpdb->prefix . 'surfer_gsc_traffic AS t2 WHERE t.post_id = t2.post_id )
+			  AND t.data_gathering_date >= %s
+			ORDER BY t.position_change ASC',
+					$query_last_date
+				)
+			);
+			wp_cache_set( $cache_key, $posts, 'surferseo_db', 5 * MINUTE_IN_SECONDS );
+		}
 
 		return $posts;
 	}
@@ -573,7 +602,7 @@ class Surfer_GSC_Drop_Monitor {
 
 		if ( ! surfer_validate_custom_request( $data['_surfer_nonce'] ) ) {
 			echo wp_json_encode( array( 'message' => 'Security check failed.' ) );
-			wp_die();
+			return;
 		}
 
 		$query        = sanitize_text_field( $data['query'] );
@@ -597,8 +626,7 @@ class Surfer_GSC_Drop_Monitor {
 			'growth' => $this->count_posts_for_performance_report( $query, $current_page, $per_page, 'growth', $sorting, true ),
 		);
 
-		echo wp_json_encode( $return );
-		wp_die();
+		wp_send_json( $return );
 	}
 
 	/**
@@ -737,7 +765,7 @@ class Surfer_GSC_Drop_Monitor {
 
 		if ( ! surfer_validate_custom_request( $data->_surfer_nonce ) ) {
 			echo wp_json_encode( array( 'message' => 'Security check failed.' ) );
-			wp_die();
+			return;
 		}
 
 		$return = new stdClass();
@@ -757,7 +785,6 @@ class Surfer_GSC_Drop_Monitor {
 		// @codingStandardsIgnoreEnd
 
 		echo wp_json_encode( $return );
-		wp_die();
 	}
 
 	/**
@@ -833,25 +860,42 @@ class Surfer_GSC_Drop_Monitor {
 
 		if ( false === $result ) {
 
-			$sql = 'SELECT COUNT(*) AS cnt FROM ' . $wpdb->prefix . 'surfer_gsc_traffic t1';
-			// $sql .= ' WHERE data_gathering_date = ( SELECT MAX(data_gathering_date) FROM ' . $wpdb->prefix . 'surfer_gsc_traffic AS t2 WHERE t1.post_id = t2.post_id )';
-
-			if ( 'prev' === $period ) {
-				$sql .= $wpdb->prepare( ' WHERE data_gathering_date >= %s', $query_previous_date );
-				$sql .= $wpdb->prepare( ' AND data_gathering_date < %s', $query_last_date );
+			if ( 'prev' === $period && 'fall' === $direction ) {
+				$result = (int) $wpdb->get_var(
+					$wpdb->prepare(
+						'SELECT COUNT(*) FROM ' . $wpdb->prefix . 'surfer_gsc_traffic t1 WHERE data_gathering_date >= %s AND data_gathering_date < %s AND position_change > 0',
+						$query_previous_date,
+						$query_last_date
+					)
+				);
+			} elseif ( 'prev' === $period ) {
+				$result = (int) $wpdb->get_var(
+					$wpdb->prepare(
+						'SELECT COUNT(*) FROM ' . $wpdb->prefix . 'surfer_gsc_traffic t1 WHERE data_gathering_date >= %s AND data_gathering_date < %s AND position_change < 0',
+						$query_previous_date,
+						$query_last_date
+					)
+				);
+			} elseif ( 'fall' === $direction ) {
+				$result = (int) $wpdb->get_var(
+					$wpdb->prepare(
+						'SELECT COUNT(*) FROM ' . $wpdb->prefix . 'surfer_gsc_traffic t1 WHERE data_gathering_date >= %s AND position_change > 0',
+						$query_last_date
+					)
+				);
 			} else {
-				$sql .= $wpdb->prepare( ' WHERE data_gathering_date >= %s', $query_last_date );
+				$result = (int) $wpdb->get_var(
+					$wpdb->prepare(
+						'SELECT COUNT(*) FROM ' . $wpdb->prefix . 'surfer_gsc_traffic t1 WHERE data_gathering_date >= %s AND position_change < 0',
+						$query_last_date
+					)
+				);
 			}
-
-			$sql .= ' AND position_change ' . ( 'fall' === $direction ? '>' : '<' ) . ' 0';
-
-			$results = $wpdb->get_results( $sql ); // @codingStandardsIgnoreLine
 
 			if ( $wpdb->last_error ) {
 				return $wpdb->last_error;
 			}
 
-			$result = isset( $results[0] ) ? $results[0]->cnt : 0;
 			wp_cache_set( $cache_key, $result, 'surfer', 60 * 5 );
 
 		}

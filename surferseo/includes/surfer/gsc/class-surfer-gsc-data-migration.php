@@ -7,6 +7,10 @@
 
 namespace SurferSEO\Surfer\GSC;
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 use stdClass;
 
 /**
@@ -33,7 +37,7 @@ class Surfer_GSC_Data_Migration {
 	 */
 	public function transfer_gsc_data_to_new_format_force() {
 
-		if ( ! surfer_validate_ajax_request() ) {
+		if ( ! surfer_validate_ajax_request() || ! check_ajax_referer( 'surfer-ajax-nonce', '_surfer_nonce', false ) ) {
 			echo wp_json_encode( array( 'message' => 'Security check failed.' ) );
 			wp_die();
 		}
@@ -50,7 +54,18 @@ class Surfer_GSC_Data_Migration {
 	public function transfer_gsc_data_to_new_format() {
 
 		global $wpdb;
-		$archives = $wpdb->get_results( 'SELECT * FROM ' . $wpdb->prefix . 'postmeta WHERE meta_key = "surfer_post_traffic_archive"' );
+		$cache_key = 'gsc_migration_archives';
+		$archives  = wp_cache_get( $cache_key, 'surferseo_db' );
+
+		if ( false === $archives ) {
+			$archives = $wpdb->get_results(
+				$wpdb->prepare(
+					'SELECT * FROM ' . $wpdb->prefix . 'postmeta WHERE meta_key = %s',
+					'surfer_post_traffic_archive'
+				)
+			);
+			wp_cache_set( $cache_key, $archives, 'surferseo_db', MINUTE_IN_SECONDS );
+		}
 
 		if ( ! $archives || count( $archives ) < 1 ) {
 			return 'No data to transfer.';

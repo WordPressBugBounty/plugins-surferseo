@@ -8,6 +8,10 @@
 
 namespace SurferSEO\Surfer\Content_Parsers;
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 if ( ! defined( 'SURFER_ASYNC_THRESHOLD' ) ) {
 	define( 'SURFER_ASYNC_THRESHOLD', 8 );
 }
@@ -49,9 +53,6 @@ class Parsers_Controller {
 	 * @return string
 	 */
 	public function parse_content( $content ) {
-
-		set_time_limit( 120 );
-
 		$content        = apply_filters( 'surfer_pre_import_content_parsing', $content );
 		$parsed_content = '';
 

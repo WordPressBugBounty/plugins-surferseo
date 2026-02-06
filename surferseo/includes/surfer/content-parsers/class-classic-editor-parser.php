@@ -8,6 +8,10 @@
 
 namespace SurferSEO\Surfer\Content_Parsers;
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 use DOMDocument;
 
 /**
@@ -59,8 +63,6 @@ class Classic_Editor_Parser extends Content_Parser {
 
 		$doc = $this->handle_links_target_attribute( $doc );
 
-		$doc = $this->remove_p_from_lists( $doc );
-
 		$h1s = $doc->getElementsByTagName( 'h1' );
 
 		foreach ( $h1s as $h1 ) {
@@ -71,39 +73,5 @@ class Classic_Editor_Parser extends Content_Parser {
 		$parsed_content = $doc->saveHTML();
 
 		return $parsed_content;
-	}
-
-	/**
-	 * Remove <p> tags from lists.
-	 *
-	 * @param DOMDocument $doc - DOM document.
-	 * @return DOMDocument
-	 */
-	private function remove_p_from_lists( $doc ) {
-		$list_items = $doc->getElementsByTagName( 'li' );
-
-		$li_array = array();
-		foreach ( $list_items as $li ) {
-			$li_array[] = $li;
-		}
-
-		foreach ( $li_array as $li ) {
-			$paragraphs = $li->getElementsByTagName( 'p' );
-
-			$p_array = array();
-			foreach ( $paragraphs as $p ) {
-				$p_array[] = $p;
-			}
-
-			foreach ( $p_array as $p ) {
-				while ( $p->firstChild ) { // phpcs:ignore
-					$li->insertBefore( $p->firstChild, $p ); // phpcs:ignore
-				}
-
-				$li->removeChild( $p );
-			}
-		}
-
-		return $doc;
 	}
 }

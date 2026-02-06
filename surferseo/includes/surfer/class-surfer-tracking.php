@@ -8,6 +8,10 @@
 
 namespace SurferSEO\Surfer;
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 use SurferSEO\Surferseo;
 
 /**
@@ -119,11 +123,12 @@ class Surfer_Tracking {
 	 * @return void
 	 */
 	public function save_dismissal_of_surfer_notification() {
-		if ( ! isset( $_GET['surfer-dismiss-and-save'] ) || ! current_user_can( 'manage_options' ) ) {
+
+		if ( ! isset( $_GET['_wpnonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ) ), 'surfer_dismiss_notification' ) ) {
 			return;
 		}
 
-		if ( ! isset( $_GET['_wpnonce'] ) || ! wp_verify_nonce( $_GET['_wpnonce'], 'surfer_dismiss_notification' ) ) {
+		if ( ! isset( $_GET['surfer-dismiss-and-save'] ) || ! current_user_can( 'manage_options' ) ) {
 			return;
 		}
 
@@ -149,11 +154,11 @@ class Surfer_Tracking {
 	 */
 	public function save_permission_allowed() {
 
-		if ( ! isset( $_GET['surfer_enable_tracking'] ) || ! current_user_can( 'manage_options' ) ) {
+		if ( ! isset( $_GET['_wpnonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ) ), 'surfer_dismiss_notification' ) ) {
 			return;
 		}
 
-		if ( ! isset( $_GET['_wpnonce'] ) || ! wp_verify_nonce( $_GET['_wpnonce'], 'surfer_dismiss_notification' ) ) {
+		if ( ! isset( $_GET['surfer_enable_tracking'] ) || ! current_user_can( 'manage_options' ) ) {
 			return;
 		}
 
@@ -246,10 +251,10 @@ class Surfer_Tracking {
 		return array_map(
 			static function ( $plugin ) {
 				if ( isset( $plugin['Version'] ) ) {
-					return $plugin['Version'];
+					return $plugin['Name'] . ' - ' . $plugin['Version'];
 				}
 
-				return 'Not Set';
+				return $plugin['Name'] . ' - Not Set';
 			},
 			$plugins
 		);
@@ -347,6 +352,10 @@ class Surfer_Tracking {
 	private function track_utm_events() {
 
 		if ( Surfer()->get_surfer_tracking()->is_tracking_allowed() ) {
+
+			if ( ! isset( $_GET['_wpnonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ) ), 'surfer_utm_events' ) ) {
+				return;
+			}
 
 			if ( isset( $_GET['utm_surfer'] ) ) {
 				$utm_surfer = sanitize_text_field( wp_unslash( $_GET['utm_surfer'] ) );

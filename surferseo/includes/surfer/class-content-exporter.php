@@ -8,6 +8,10 @@
 
 namespace SurferSEO\Surfer;
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 use DOMDocument;
 use DOMElement;
 use SurferSEO\Surfer;
@@ -80,6 +84,7 @@ class Content_Exporter {
 		$post_id          = isset( $data->post_id ) ? intval( $data->post_id ) : false;
 		$meta_title       = isset( $data->post_id ) ? sanitize_text_field( wp_unslash( Surfer()->get_surfer()->get_post_meta_title( $data->post_id ) ) ) : false;
 		$meta_description = isset( $data->post_id ) ? sanitize_text_field( wp_unslash( Surfer()->get_surfer()->get_post_meta_description( $data->post_id ) ) ) : false;
+		$workspace_id     = isset( $data->workspace_id ) ? sanitize_text_field( wp_unslash( $data->workspace_id ) ) : false;
 
 		if ( false === $keywords || '' === $keywords || empty( $keywords ) ) {
 			echo wp_json_encode( array( 'message' => 'You need to provide at least one keyword.' ) );
@@ -98,6 +103,7 @@ class Content_Exporter {
 			'url'              => apply_filters( 'surfer_api_base_url', get_site_url() ),
 			'meta_title'       => $meta_title,
 			'meta_description' => $meta_description,
+			'workspace_id'     => $workspace_id,
 		);
 
 		list(
@@ -462,7 +468,7 @@ class Content_Exporter {
 	 */
 	public function gather_posts_to_reconnect() {
 
-		if ( ! surfer_validate_ajax_request() ) {
+		if ( ! surfer_validate_ajax_request() || ! check_ajax_referer( 'surfer-ajax-nonce', '_surfer_nonce', false ) ) {
 			echo wp_json_encode( array( 'message' => 'Security check failed.' ) );
 			wp_die();
 		}
@@ -496,12 +502,12 @@ class Content_Exporter {
 	 */
 	public function reconnect_posts_with_drafts() {
 
-		if ( ! surfer_validate_ajax_request() ) {
+		if ( ! surfer_validate_ajax_request() || ! check_ajax_referer( 'surfer-ajax-nonce', '_surfer_nonce', false ) ) {
 			echo wp_json_encode( array( 'message' => 'Security check failed.' ) );
 			wp_die();
 		}
 
-		$posts = isset( $_POST['posts'] ) ? wp_unslash( $_POST['posts'] ) : false;
+		$posts = isset( $_POST['posts'] ) ? array_map( 'intval', wp_unslash( $_POST['posts'] ) ) : false;
 
 		if ( ! $posts ) {
 			echo wp_json_encode( array( 'message' => 'No posts to reconnect.' ) );
@@ -576,7 +582,7 @@ class Content_Exporter {
 	 */
 	public function surfer_remove_old_backups() {
 
-		if ( ! surfer_validate_ajax_request() ) {
+		if ( ! surfer_validate_ajax_request() || ! check_ajax_referer( 'surfer-ajax-nonce', '_surfer_nonce', false ) ) {
 			echo wp_json_encode( array( 'message' => 'Security check failed.' ) );
 			wp_die();
 		}

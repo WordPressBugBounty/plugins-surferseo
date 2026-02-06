@@ -8,6 +8,10 @@
 
 namespace SurferSEO\Forms\Fields;
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 /**
  * Class to handle <input type="text">
  */

@@ -8,6 +8,10 @@
 
 namespace SurferSEO\Surfer;
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 use SurferSEO\Surferseo;
 use SurferSEO\Surfer\Integrations\Integrations;
 use SurferSEO\Surfer\Content_Parsers\Parsers_Controller;
@@ -42,6 +46,7 @@ class Surfer_General_Endpoints {
 
 		add_filter( 'wp_ajax_surfer_get_user_drafts', array( $this, 'get_user_drafts' ) );
 		add_filter( 'wp_ajax_surfer_get_user_credits', array( $this, 'get_user_credits' ) );
+		add_filter( 'wp_ajax_surfer_get_user_workspaces', array( $this, 'get_user_workspaces' ) );
 	}
 
 	/**
@@ -76,10 +81,12 @@ class Surfer_General_Endpoints {
 			wp_die();
 		}
 
-		$query = isset( $data->query ) ? $data->query : '';
+		$query        = isset( $data->query ) ? $data->query : '';
+		$workspace_id = isset( $data->workspace_id ) ? $data->workspace_id : null;
 
 		$params = array(
 			'query_keyword' => $query,
+			'workspace_id'  => $workspace_id,
 		);
 
 		list(
@@ -98,7 +105,7 @@ class Surfer_General_Endpoints {
 					'contentScore'          => $this->get_content_score( $draft ),
 					'keyword'               => $draft['keyword']['item'],
 					'keywords'              => $this->put_keywords_in_array( $draft['keywords'] ),
-					'location'              => $draft['scrape']['location'],
+					'location'              => $draft['scrape']['location'] ? $draft['scrape']['location'] : $draft['seo_guidelines'][0]['location'],
 					'folderName'            => isset( $draft['folder'] ) ? $draft['folder'] : null,
 					'editedInSurferDate'    => gmdate( 'd M Y H:i:s', strtotime( $draft['updated_at'] ) ),
 					'editedInWordPressDate' => $this->get_last_edition_date_if_post_synced( $draft ),
@@ -218,6 +225,27 @@ class Surfer_General_Endpoints {
 			'code'     => $code,
 			'response' => $response,
 		) = Surfer()->get_surfer()->make_surfer_request( '/get_organization_credits', array(), 'GET' );
+
+		echo wp_json_encode( $response );
+		wp_die();
+	}
+
+	/**
+	 * Returns user workspaces from Surfer.
+	 */
+	public function get_user_workspaces() {
+		$json = file_get_contents( 'php://input' );
+		$data = json_decode( $json );
+
+		if ( ! surfer_validate_custom_request( $data->_surfer_nonce ) ) {
+			echo wp_json_encode( array( 'message' => 'Security check failed.' ) );
+			wp_die();
+		}
+
+		list(
+			'code'     => $code,
+			'response' => $response,
+		) = Surfer()->get_surfer()->make_surfer_request( '/workspaces', array(), 'GET' );
 
 		echo wp_json_encode( $response );
 		wp_die();

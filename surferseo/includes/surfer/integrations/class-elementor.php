@@ -8,6 +8,10 @@
 
 namespace SurferSEO\Surfer\Integrations;
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 use Elementor\Controls_Manager;
 use Elementor\Core\DocumentTypes\PageBase;
 

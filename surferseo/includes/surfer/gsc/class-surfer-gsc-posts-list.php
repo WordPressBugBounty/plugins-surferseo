@@ -7,6 +7,10 @@
 
 namespace SurferSEO\Surfer\GSC;
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 /**
  * Class to handle data migration
  */

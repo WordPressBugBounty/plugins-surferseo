@@ -8,13 +8,17 @@
 
 namespace SurferSEO\Surfer\Integrations;
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 /**
  * Content exporter object.
  */
 class Integrations {
 
 	/**
-	 * Class that handle elementor integrartion.
+	 * Class that handle elementor integration.
 	 *
 	 * @var Elementor
 	 */

@@ -8,6 +8,10 @@
 
 namespace SurferSEO\Surfer;
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 use SurferSEO\Surferseo;
 
 /**

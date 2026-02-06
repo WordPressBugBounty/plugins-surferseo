@@ -8,6 +8,10 @@
 
 namespace SurferSEO\Forms\Fields;
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 /**
  * Boilerplate for all form elements classes.
  */

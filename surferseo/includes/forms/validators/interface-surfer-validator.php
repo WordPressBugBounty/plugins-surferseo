@@ -7,6 +7,10 @@
 
 namespace SurferSEO\Forms\Validators;
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 /**
  * Interface for Surfer Forms Validator.
  */

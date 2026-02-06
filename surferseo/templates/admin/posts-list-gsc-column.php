@@ -5,6 +5,8 @@
  * @package SurferSEO
  */
 
+if ( ! defined( 'ABSPATH' ) ) exit;
+
 ?>
 
 <div class="surfer-post-list-traffic" style="max-width: 230px;">

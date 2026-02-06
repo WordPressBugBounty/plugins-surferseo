@@ -3,8 +3,8 @@ Contributors: surferseo, xingupl, judytafromsurfer
 Tags: seo, keywords, content writing, content, keyword research
 Requires at least: 6.0
 Requires PHP: 7.4
-Tested up to: 6.8
-Stable tag: 1.6.5.584
+Tested up to: 6.9
+Stable tag: 1.6.7.618
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -87,6 +87,17 @@ It is not a bug, it is a feature. ;)
 4. Select prewritten, drafted, pending, future, and published content  and export it to WordPress with just a few clicks.
 
 == Changelog ==
+
+= 1.6.7 =
+* FEATURE: Support for new workspaces in Surfer 
+* FIX: Improved security & speed
+* FIX: Config form save error that randomly occurred
+* FIX: CRON reduce logs
+* FIX: URLs redirecting to old Surfer paths
+
+= 1.6.6 =
+* FIX: Issue with importing content
+* FIX: Connection issue for servers that not support transients
 
 = 1.6.5 =
 * FEATURE: New filters to allow customized content parsing
@@ -239,7 +250,13 @@ It is not a bug, it is a feature. ;)
 
 == Upgrade Notice ==
 
-= 1.6.4 =
+= 1.6.7 =
+Required to use new workspaces in Surfer. Also better speed and security.
+
+= 1.6.6 =
+Solve import error for Elementor and Classic Editor. 
+
+= 1.6.5 =
 Security improvements and new content parsing hooks
 
 = 1.6.4 =

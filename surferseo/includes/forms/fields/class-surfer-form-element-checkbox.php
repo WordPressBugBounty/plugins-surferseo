@@ -8,6 +8,10 @@
 
 namespace SurferSEO\Forms\Fields;
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 /**
  * Class to handle <input type="checkbox">
  */
@@ -34,7 +38,7 @@ class Surfer_Form_Element_Checkbox extends Surfer_Form_Element_Multichoice {
 		?>
 			<?php foreach ( $this->options as $option ) : ?>
 				<label>
-					<input type="checkbox"  name="<?php echo esc_html( $this->name ); ?>[]" value="<?php echo esc_html( $option['value'] ); ?>" class="<?php echo esc_html( $this->get_classes() ); ?>" <?php echo ( in_array( $option['value'], (array) $this->value ) ) ? 'checked="checked"' : ''; ?> />
+					<input type="checkbox"  name="<?php echo esc_html( $this->name ); ?>[]" value="<?php echo esc_html( $option['value'] ); ?>" class="<?php echo esc_html( $this->get_classes() ); ?>" <?php echo ( in_array( $option['value'], (array) $this->value, true ) ) ? 'checked="checked"' : ''; ?> />
 					<?php echo esc_html( $option['label'] ); ?>
 				</label>
 			<?php endforeach; ?>
@@ -43,5 +47,4 @@ class Surfer_Form_Element_Checkbox extends Surfer_Form_Element_Multichoice {
 
 		echo wp_kses( $content, parent::return_allowed_html_for_forms_elements() );
 	}
-
 }

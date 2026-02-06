@@ -8,6 +8,10 @@
 
 namespace SurferSEO;
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 /**
  * Object to autoload required files.
  */

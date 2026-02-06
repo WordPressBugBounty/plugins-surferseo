@@ -8,6 +8,10 @@
 
 namespace SurferSEO\Forms\Fields;
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 /**
  * Class to handle header in forms.
  */
@@ -40,5 +44,4 @@ class Surfer_Form_Element_Header extends Surfer_Form_Element {
 
 		echo wp_kses( $content, parent::return_allowed_html_for_forms_elements() );
 	}
-
 }

@@ -8,6 +8,10 @@
 
 namespace SurferSEO\Surfer;
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 use SurferSEO\Surferseo;
 use SurferSEO\Surfer\Integrations\Integrations;
 use SurferSEO\Surfer\Surfer_GSC;
@@ -355,7 +359,7 @@ class Surfer {
 	 */
 	public function get_ajax_surfer_connect_url() {
 
-		if ( ! surfer_validate_ajax_request() ) {
+		if ( ! surfer_validate_ajax_request() || ! check_ajax_referer( 'surfer-ajax-nonce', '_surfer_nonce', false ) ) {
 			echo wp_json_encode( array( 'message' => 'Security check failed.' ) );
 			wp_die();
 		}
@@ -388,7 +392,7 @@ class Surfer {
 	private function generate_connection_token() {
 		$token = wp_generate_uuid4();
 
-		set_transient( 'surfer_connection_token', $token, 60 * 5 );
+		update_option( 'surfer_connection_token', $token, false );
 
 		return $token;
 	}
@@ -408,7 +412,7 @@ class Surfer {
 		if ( false !== $token && $this->verify_connection_token( $token ) ) {
 			$api_key     = sanitize_text_field( wp_unslash( $request['api_key'] ) );
 			$token_saved = update_option( 'wpsurfer_api_access_key', $api_key, false );
-			delete_transient( 'surfer_connection_token' );
+			delete_option( 'surfer_connection_token' );
 
 			$connection_details = array(
 				'organization_name' => $request['organization_name'],
@@ -440,7 +444,7 @@ class Surfer {
 	 * @return bool
 	 */
 	private function verify_connection_token( $token ) {
-		$wp_token = get_transient( 'surfer_connection_token' );
+		$wp_token = get_option( 'surfer_connection_token' );
 
 		if ( false !== $wp_token && $wp_token === $token ) {
 			return true;
@@ -468,7 +472,7 @@ class Surfer {
 	 */
 	public function check_connection_status() {
 
-		if ( ! surfer_validate_ajax_request() ) {
+		if ( ! surfer_validate_ajax_request() || ! check_ajax_referer( 'surfer-ajax-nonce', '_surfer_nonce', false ) ) {
 			echo wp_json_encode( array( 'message' => 'Security check failed.' ) );
 			wp_die();
 		}
@@ -495,7 +499,7 @@ class Surfer {
 	 */
 	public function disconnect_surfer_from_wp() {
 
-		if ( ! surfer_validate_ajax_request() ) {
+		if ( ! surfer_validate_ajax_request() || ! check_ajax_referer( 'surfer-ajax-nonce', '_surfer_nonce', false ) ) {
 			echo wp_json_encode( array( 'message' => 'Security check failed.' ) );
 			wp_die();
 		}
@@ -584,7 +588,7 @@ class Surfer {
 					'error'            => __( 'There was an error on post adding', 'surferseo' ),
 					'wp_error_message' => $post_id->get_error_message(),
 				),
-				403
+				$post_id->get_error_code()
 			);
 		}
 	}
@@ -1123,11 +1127,14 @@ class Surfer {
 			return array( 'message' => __( 'You need to connect your page to Surfer first.', 'surferseo' ) );
 		}
 
+		$workspace_id = isset( $params['workspace_id'] ) ? $params['workspace_id'] : null;
+
 		$args = array(
 			'method'  => $method,
 			'headers' => array(
 				'Content-Type' => 'application/json',
 				'api-key'      => $token,
+				'workspace-id' => $workspace_id,
 			),
 			'body'    => wp_json_encode( $params ),
 		);
@@ -1207,7 +1214,6 @@ class Surfer {
 
 		wp_register_script( 'surfer-guidelines-debug', $base_url . '/assets/js/surfer-guidelines-debug.js', array(), SURFER_VERSION, false );
 		wp_register_script( 'surfer-guidelines', $surfer_url . '/static/surfer_guidelines_1_3_1.js', array( 'surfer-guidelines-debug' ), SURFER_VERSION, false );
-		// wp_register_script( 'surfer-guidelines', 'http://localhost:8080/extensions/browser/content-editor/editor-integration/lib/lib.js', array( 'surfer-guidelines-debug' ), SURFER_VERSION, false );
 
 		$react_deps = array(
 			'wp-plugins',
@@ -1219,6 +1225,14 @@ class Surfer {
 			'wp-tinymce',
 			'surfer-guidelines',
 		);
+		// Ensure the JSX runtime is present when the bundle uses the automatic JSX transform.
+		// These handles exist in newer WordPress versions; add them only if registered.
+		if ( wp_script_is( 'react-jsx-runtime', 'registered' ) ) {
+			$react_deps[] = 'react-jsx-runtime';
+		}
+		if ( wp_script_is( 'react-jsx-dev-runtime', 'registered' ) ) {
+			$react_deps[] = 'react-jsx-dev-runtime';
+		}
 
 		wp_enqueue_script(
 			'surfer-general',

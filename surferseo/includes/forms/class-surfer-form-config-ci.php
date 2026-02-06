@@ -8,6 +8,10 @@
 
 namespace SurferSEO\Forms;
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 use SurferSEO\Forms\Fields\Surfer_Form_Element_Checkbox;
 use SurferSEO\Surferseo;
 use SurferSEO\Forms\Fields\Surfer_Form_Element_Header;
@@ -127,7 +131,6 @@ class Surfer_Form_Config_Ci extends Surfer_Form {
 		$field->add_option( '', __( 'Auto Detection (Default)', 'surferseo' ) );
 		$field->add_option( 'aioseo', __( 'All in One SEO', 'surferseo' ) );
 		$field->add_option( 'rank_math', __( 'Rank Math', 'surferseo' ) );
-		// $field->add_option( 'surfer', __( 'Surfer Plugin build-in', 'surferseo' ) );
 		$field->add_option( 'yoast', __( 'Yoast SEO', 'surferseo' ) );
 		$field->set_row_classes( 'surfer-connected' );
 		$this->add_field( $field );
@@ -485,7 +488,7 @@ class Surfer_Form_Config_Ci extends Surfer_Form {
 							</p>
 
 							<p class="surfer-connection-box__actions">
-								<a href="<?php echo esc_attr( Surfer()->get_surfer()->get_surfer_url() ); ?>/search_consoles/list" target="_blank" class="surfer-button surfer-button--secondary surfer-button--xsmall">
+								<a href="<?php echo esc_attr( Surfer()->get_surfer()->get_surfer_url() ); ?>/settings/google_search_console" target="_blank" class="surfer-button surfer-button--secondary surfer-button--xsmall">
 									<?php esc_html_e( 'Edit GSC integration inside Surfer', 'surferseo' ); ?>
 								</a>
 							</p>
@@ -503,7 +506,7 @@ class Surfer_Form_Config_Ci extends Surfer_Form {
 							</p>
 
 							<p class="surfer-connection-box__actions">
-								<a href="<?php echo esc_attr( Surfer()->get_surfer()->get_surfer_url() ); ?>/search_consoles/list" class="surfer-button surfer-button--primary surfer-button--small" target="_blank">
+								<a href="<?php echo esc_attr( Surfer()->get_surfer()->get_surfer_url() ); ?>/settings/google_search_console" class="surfer-button surfer-button--primary surfer-button--small" target="_blank">
 									<?php esc_html_e( 'Add GSC account to Surfer', 'surferseo' ); ?>
 								</a>
 							</p>
@@ -541,7 +544,7 @@ class Surfer_Form_Config_Ci extends Surfer_Form {
 				<?php foreach ( $field->get_options() as $option ) : ?>
 					<?php echo esc_html( $field->get_label() ); ?>
 					<label class="switch">
-						<input type="checkbox" name="<?php echo esc_html( $field->get_name() ); ?>[]" value="<?php echo esc_html( $option['value'] ); ?>" <?php echo ( in_array( $option['value'], (array) $field->get_value() ) ) ? 'checked="checked"' : ''; ?>>
+						<input type="checkbox" name="<?php echo esc_html( $field->get_name() ); ?>[]" value="<?php echo esc_html( $option['value'] ); ?>" <?php echo ( in_array( $option['value'], (array) $field->get_value(), true ) ) ? 'checked="checked"' : ''; ?>>
 						<span class="slider round"></span>
 					</label>
 					<?php echo esc_html( $option['label'] ); ?>
@@ -638,9 +641,10 @@ class Surfer_Form_Config_Ci extends Surfer_Form {
 	 */
 	public function save( $tab = false ) {
 
-		$tracking_enabled = Surfer()->get_surfer_tracking()->is_tracking_allowed();
+		$tracking_enabled      = Surfer()->get_surfer_tracking()->is_tracking_allowed();
+		$tracking_enabled_post = absint( filter_input( INPUT_POST, 'surfer_tracking_enabled', FILTER_DEFAULT, FILTER_REQUIRE_ARRAY )[0] );
 
-		if ( $tracking_enabled || ( isset( $_POST['surfer_tracking_enabled'] ) && 1 === intval( $_POST['surfer_tracking_enabled'] ) ) ) {
+		if ( $tracking_enabled || 1 === $tracking_enabled_post ) {
 			$data = $this->check_if_tracking_or_emails_was_changed();
 			Surfer()->get_surfer_tracking()->track_wp_event( 'config_saved', wp_json_encode( $data ) );
 		}
@@ -654,7 +658,9 @@ class Surfer_Form_Config_Ci extends Surfer_Form {
 			set_transient( 'surfer_tracking_first_enabled', true, 60 * 60 * 24 * 30 );
 		}
 
+		// phpcs:ignore
 		if ( isset( $_POST['wpsurfer_api_access_key'] ) ) {
+			// phpcs:ignore
 			update_option( 'wpsurfer_api_access_key', sanitize_text_field( wp_unslash( $_POST['wpsurfer_api_access_key'] ) ) );
 		}
 
@@ -668,8 +674,8 @@ class Surfer_Form_Config_Ci extends Surfer_Form {
 	 */
 	private function check_if_tracking_or_emails_was_changed() {
 
-		$tracking = isset( $_POST['surfer_tracking_enabled'] ) ? wp_unslash( $_POST['surfer_tracking_enabled'] ) : false;
-		$emails   = isset( $_POST['surfer_position_monitor_summary'] ) ? wp_unslash( $_POST['surfer_position_monitor_summary'] ) : false;
+		$tracking = absint( filter_input( INPUT_POST, 'surfer_tracking_enabled', FILTER_DEFAULT, FILTER_REQUIRE_ARRAY )[0] );
+		$emails   = absint( filter_input( INPUT_POST, 'surfer_position_monitor_summary', FILTER_DEFAULT, FILTER_REQUIRE_ARRAY )[0] );
 
 		$tracking_current_state = Surfer()->get_surfer_tracking()->is_tracking_allowed();
 		$emails_current_state   = $this->performance_report_email_notification_enabled();

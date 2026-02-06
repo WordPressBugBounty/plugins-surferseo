@@ -8,6 +8,10 @@
 
 namespace SurferSEO\Surfer;
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 use SurferSEO\Surfer\GSC\{
 	Surfer_GSC_Common,
 	Surfer_GSC_Notifications,

@@ -8,6 +8,10 @@
 
 namespace SurferSEO;
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 use SurferSEO\Autoloader;
 use SurferSEO\Seo_Manager;
 use SurferSEO\Surfer\Surfer;
@@ -293,12 +297,35 @@ class Surferseo {
 	/**
 	 * Includes styles and scripts in wp-admin
 	 *
-	 * @param string $hook - page where code is executed.
 	 * @return void
 	 */
-	public function admin_enqueue_scripts( $hook ) {
+	public function admin_enqueue_scripts( $hook_suffix = '' ) {
+		unset( $hook_suffix );
+
+		if ( ! function_exists( 'get_current_screen' ) ) {
+			return;
+		}
+
+		$screen = get_current_screen();
+		if ( empty( $screen ) ) {
+			return;
+		}
 
 		wp_enqueue_style( 'surfer-components', $this->baseurl . 'assets/css/components.css', array(), SURFER_VERSION );
+
+		// Only load Surfer styles on Surfer admin pages or post editor screens where Surfer UI is used.
+		$is_surfer_page = ( false !== strpos( (string) $screen->id, 'toplevel_page_surfer' ) )
+			|| ( 0 === strpos( (string) $screen->id, 'surfer_page_' ) );
+
+		$is_post_editor = ( 'post' === (string) $screen->base )
+			&& ! empty( $screen->post_type )
+			&& function_exists( 'surfer_return_supported_post_types' )
+			&& in_array( $screen->post_type, surfer_return_supported_post_types(), true );
+
+		if ( ! $is_surfer_page && ! $is_post_editor ) {
+			return;
+		}
+
 		wp_enqueue_style( 'surfer-admin', $this->baseurl . 'assets/css/admin.css', array( 'surfer-components' ), SURFER_VERSION );
 		wp_enqueue_style( 'surfer-styles', $this->baseurl . 'assets/css/surferseo.css', array( 'surfer-components' ), SURFER_VERSION );
 	}
@@ -332,7 +359,9 @@ class Surferseo {
 		if ( ! isset( $schedules['monthly'] ) ) {
 			$schedules['monthly'] = array(
 				'interval' => 30 * DAY_IN_SECONDS,
-				'display'  => __( 'Monthly', 'surferseo' ),
+				// Intentionally not translated to avoid triggering JIT translation loading too early.
+				// This filter can run before init in some WP flows (WP 6.7+ warns about early i18n loading).
+				'display'  => 'Monthly',
 			);
 		}
 

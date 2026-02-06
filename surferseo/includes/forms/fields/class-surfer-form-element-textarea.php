@@ -8,6 +8,10 @@
 
 namespace SurferSEO\Forms\Fields;
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 /**
  * Class to handle <textarea />
  */
@@ -38,5 +42,4 @@ class Surfer_Form_Element_Textarea extends Surfer_Form_Element {
 
 		echo wp_kses( $content, parent::return_allowed_html_for_forms_elements() );
 	}
-
 }

@@ -10,6 +10,10 @@
 
 namespace SurferSEO\Surfer;
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 use SurferSEO\Surferseo;
 use SurferSEO\Surfer\Content_Parsers\Parsers_Controller;
 use SurferSEO\Surfer\Surfer_Logger;
@@ -69,7 +73,6 @@ class Content_Importer {
 		try {
 			$image_count = substr_count( $content, '<img' );
 			$this->content_parser->set_image_processing_mode( $image_count );
-
 			$content = $this->content_parser->parse_content( $content );
 			$content = $this->sanitize_content_for_database( $content );
 			$title   = isset( $args['post_title'] ) && strlen( $args['post_title'] ) > 0 ? $args['post_title'] : $this->content_parser->return_title();
@@ -124,7 +127,7 @@ class Content_Importer {
 
 		} catch ( \Exception $e ) {
 			$logger->log_import( $original_content, '', null, $e->getMessage() );
-			return new \WP_Error( 'import_exception', $e->getMessage() );
+			return new \WP_Error( 500, 'Surfer import failed: ' . $e->getMessage() );
 		}
 	}
 
@@ -134,10 +137,6 @@ class Content_Importer {
 	 * @return void
 	 */
 	private function increase_limits_for_import() {
-		if ( ! ini_get( 'safe_mode' ) ) {
-			set_time_limit( 300 );
-		}
-
 		$current_limit = ini_get( 'memory_limit' );
 		if ( $current_limit && '-1' !== $current_limit ) {
 			$current_bytes  = $this->convert_to_bytes( $current_limit );

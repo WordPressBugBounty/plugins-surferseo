@@ -8,6 +8,10 @@
 
 namespace SurferSEO\Forms;
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 use SurferSEO\Surferseo;
 
 /**
@@ -264,8 +268,17 @@ class Surfer_Form {
 					</div>
 				<?php endforeach; ?>
 
-				<?php if ( $this->if_display_submit_button() || ( isset( $_GET['developer_mode'] ) && 1 === (int) $_GET['developer_mode'] ) ) : ?>
-					<input type="submit" value="Save changes" class="button-primary bottom-submit-button <?php ( ( ! isset( $_GET['developer_mode'] ) || 1 !== (int) $_GET['developer_mode'] ) ) ? 'surfer-connected' : ''; ?>" name="Submit" />
+				<?php
+				$developer_mode = absint( filter_input( INPUT_GET, 'developer_mode', FILTER_DEFAULT ) );
+				$show_submit    = $this->if_display_submit_button() || 1 === $developer_mode;
+
+				if ( $show_submit ) :
+					$submit_classes = 'button-primary bottom-submit-button';
+					if ( 1 !== $developer_mode ) {
+						$submit_classes .= ' surfer-connected';
+					}
+					?>
+					<input type="submit" value="Save changes" class="<?php echo esc_attr( $submit_classes ); ?>" name="Submit" />
 				<?php endif; ?>
 			</div>
 		<?php
@@ -421,15 +434,15 @@ class Surfer_Form {
 		$options = array();
 		foreach ( $this->get_fields() as $field ) {
 			if ( 'checkbox' === $field->get_type() ) {
-				$value = false;
-				if ( isset( $_POST[ $field->get_name() ] ) ) {
-					$value = $_POST[ $field->get_name() ];
-				}
+				$name = $field->get_name();
+				if ( filter_has_var( INPUT_POST, $name ) ) {
+					$value = filter_input( INPUT_POST, $name, FILTER_DEFAULT, FILTER_REQUIRE_ARRAY );
+					$value = $value[0];
+					$value = is_scalar( $value ) ? sanitize_text_field( (string) $value ) : '';
 
-				if ( $value ) {
-					$options[ $field->get_name() ] = $value;
+					$options[ $name ] = $value ? $value : null;
 				} else {
-					$options[ $field->get_name() ] = null;
+					$options[ $name ] = null;
 				}
 			} else {
 				$options[ $field->get_name() ] = $field->get_value();

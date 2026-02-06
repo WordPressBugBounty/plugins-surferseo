@@ -8,6 +8,10 @@
 
 namespace SurferSEO\Surfer;
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 /**
  * Logger class for Surfer operations.
  */
@@ -109,7 +113,7 @@ class Surfer_Logger {
 		$this->cleanup_old_entries( $xml );
 
 		$dom               = new \DOMDocument( '1.0', 'UTF-8' );
-		$dom->formatOutput = true;
+		$dom->formatOutput = true; // phpcs:ignore WordPress.NamingConventions.ValidVariableName.MemberNotSnakeCase
 		$dom->loadXML( $xml->asXML() );
 		$dom->save( $log_file );
 	}
@@ -128,7 +132,7 @@ class Surfer_Logger {
 			$to_remove = $count - self::MAX_LOGS;
 			for ( $i = 0; $i < $to_remove; $i++ ) {
 				$dom = dom_import_simplexml( $entries[ $i ] );
-				$dom->parentNode->removeChild( $dom );
+				$dom->parentNode->removeChild( $dom ); // phpcs:ignore WordPress.NamingConventions.ValidVariableName.MemberNotSnakeCase
 			}
 		}
 	}

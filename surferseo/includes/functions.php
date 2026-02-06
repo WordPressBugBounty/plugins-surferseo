@@ -5,6 +5,35 @@
  * @package SurferSEO
  */
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
+/**
+ * Returns default TTL for DB query cache.
+ *
+ * @return int
+ */
+function surfer_get_db_cache_ttl() {
+	/**
+	 * Filters TTL for DB query cache.
+	 *
+	 * @param int $ttl Cache TTL in seconds.
+	 */
+	return (int) apply_filters( 'surferseo_db_cache_ttl', MINUTE_IN_SECONDS );
+}
+
+/**
+ * Generates cache key for DB query.
+ *
+ * @param string $sql Prepared SQL query.
+ * @param string $type Cache type prefix.
+ * @return string
+ */
+function surfer_get_db_cache_key( $sql, $type = 'q' ) {
+	return $type . ':' . md5( (string) $sql );
+}
+
 /**
  * Returns post GSC traffic by post ID.
  *
@@ -13,7 +42,24 @@
  */
 function surfer_get_last_post_traffic_by_id( $post_id ) {
 	global $wpdb;
-	return $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$wpdb->prefix}surfer_gsc_traffic WHERE post_id = %d ORDER BY data_gathering_date DESC LIMIT 1", $post_id ), ARRAY_A );
+
+	$cache_key = 'last_post_traffic_' . absint( $post_id );
+	$cached    = wp_cache_get( $cache_key, 'surferseo_db' );
+	if ( false !== $cached ) {
+		return $cached;
+	}
+
+	$result = $wpdb->get_row(
+		$wpdb->prepare(
+			"SELECT * FROM {$wpdb->prefix}surfer_gsc_traffic WHERE post_id = %d ORDER BY data_gathering_date DESC LIMIT 1",
+			$post_id
+		),
+		ARRAY_A
+	);
+
+	wp_cache_set( $cache_key, $result, 'surferseo_db', 5 * MINUTE_IN_SECONDS );
+
+	return $result;
 }
 
 /**

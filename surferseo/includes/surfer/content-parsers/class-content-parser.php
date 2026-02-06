@@ -8,6 +8,10 @@
 
 namespace SurferSEO\Surfer\Content_Parsers;
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 /**
  * Object that imports data from different sources into WordPress.
  */
@@ -37,6 +41,7 @@ class Content_Parser {
 	public function parse_content( $content ) {
 
 		$this->title = wp_strip_all_tags( $this->get_title_from_content( $content ) );
+		$content     = $this->clear_lists( $content );
 
 		return $content;
 	}
@@ -159,14 +164,20 @@ class Content_Parser {
 	private function find_existing_attachment( $image_url ) {
 		global $wpdb;
 
-		$attachment_id = $wpdb->get_var(
-			$wpdb->prepare(
-				"SELECT post_id FROM {$wpdb->postmeta} 
+		$cache_key     = 'attachment_by_url_' . md5( (string) $image_url );
+		$attachment_id = wp_cache_get( $cache_key, 'surferseo_db' );
+
+		if ( false === $attachment_id ) {
+			$attachment_id = $wpdb->get_var(
+				$wpdb->prepare(
+					"SELECT post_id FROM {$wpdb->postmeta} 
 			 WHERE meta_key = 'surfer_file_original_url' 
 			 AND meta_value LIKE %s",
-				$image_url
-			)
-		);
+					$image_url
+				)
+			);
+			wp_cache_set( $cache_key, $attachment_id, 'surferseo_db', 5 * MINUTE_IN_SECONDS );
+		}
 
 		return $attachment_id ? (int) $attachment_id : false;
 	}
@@ -335,5 +346,29 @@ class Content_Parser {
 	 */
 	public function set_image_processing_mode( $processing_mode ) {
 		$this->image_processing_mode = $processing_mode;
+	}
+
+	/**
+	 * Clear lists from content.
+	 *
+	 * @param string $content - content to clear.
+	 * @return string
+	 */
+	protected function clear_lists( $content ) {
+		$content = preg_replace_callback(
+			'/(<li[^>]*>)(.*?)(<\/li>)/is',
+			function ( $matches ) {
+				$li_open    = $matches[1];
+				$li_content = $matches[2];
+				$li_close   = $matches[3];
+
+				$li_content = preg_replace( '/<\/?p[^>]*>/i', '', $li_content );
+
+				return $li_open . $li_content . $li_close;
+			},
+			$content
+		);
+
+		return $content;
 	}
 }

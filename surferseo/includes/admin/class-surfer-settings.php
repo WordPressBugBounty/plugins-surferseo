@@ -7,6 +7,10 @@
 
 namespace SurferSEO\Admin;
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 use SurferSEO\Surfer\Content_Parsers\Parsers_Controller;
 
 /**

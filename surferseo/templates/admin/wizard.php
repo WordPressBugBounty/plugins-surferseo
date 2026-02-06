@@ -5,6 +5,8 @@
  * @package SurferSEO
  */
 
+if ( ! defined( 'ABSPATH' ) ) exit;
+
 ?>
 <div class="wrap wizard-wrapper">
 

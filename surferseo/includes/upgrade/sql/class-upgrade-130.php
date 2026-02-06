@@ -7,6 +7,9 @@
 
 namespace SurferSEO\Upgrade\SQL;
 
+
+if ( ! defined( 'ABSPATH' ) ) exit;
+
 use SurferSEO\Upgrade\Database_Upgrade;
 
 /**

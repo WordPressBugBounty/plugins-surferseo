@@ -8,6 +8,10 @@
 
 namespace SurferSEO\Surfer\Content_Parsers;
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 use DOMDocument;
 
 /**
@@ -141,7 +145,7 @@ class Gutenberg_Parser extends Content_Parser {
 	}
 
 	/**
-	 * Functions prepare attributes for HTML and Gutendber tags.
+	 * Functions prepare attributes for HTML and Gutenberg tags.
 	 *
 	 * @param DOMNode|DOMDocument|DOMElement $node - node to parse.
 	 * @return array
@@ -345,15 +349,12 @@ class Gutenberg_Parser extends Content_Parser {
 			return '';
 		}
 
+		$node_content = $this->clear_lists( $node_content );
+		$node_content = $this->add_gutenberg_list_comments( $node_content );
+
 		$content  = '<!-- wp:list -->' . PHP_EOL;
 		$content .= '<ul>' . PHP_EOL;
-
-		foreach ( $node->getElementsByTagName( 'li' ) as $li ) {
-			foreach ( $li->getElementsByTagName( 'p' ) as $p ) {
-				$content .= '<li>' . $this->get_inner_html( $p ) . '</li>' . PHP_EOL;
-			}
-		}
-
+		$content .= $node_content;
 		$content .= '</ul>' . PHP_EOL;
 		$content .= '<!-- /wp:list -->' . PHP_EOL . PHP_EOL;
 
@@ -379,8 +380,11 @@ class Gutenberg_Parser extends Content_Parser {
 		$content .= '<ol>' . PHP_EOL;
 
 		foreach ( $node->getElementsByTagName( 'li' ) as $li ) {
-			foreach ( $li->getElementsByTagName( 'p' ) as $p ) {
-				$content .= '<li>' . $this->get_inner_html( $p ) . '</li>' . PHP_EOL;
+			// @codingStandardsIgnoreLine
+			foreach ( $li->childNodes as $li ) {
+				$content .= '<!-- wp:list-item -->' . PHP_EOL;
+				$content .= '<li>' . $this->get_inner_html( $li ) . '</li>' . PHP_EOL;
+				$content .= '<!-- /wp:list-item -->' . PHP_EOL;
 			}
 		}
 
@@ -479,6 +483,25 @@ class Gutenberg_Parser extends Content_Parser {
 		$content .= '</table>' . PHP_EOL;
 		$content .= '</figure>' . PHP_EOL;
 		$content .= '<!-- /wp:table -->' . PHP_EOL . PHP_EOL;
+
+		return $content;
+	}
+
+	/**
+	 * Add Gutenberg block comments to lists.
+	 *
+	 * @param string $content - content to process.
+	 * @return string
+	 */
+	protected function add_gutenberg_list_comments( $content ) {
+		$content = preg_replace( '/<li([^>]*)>/', '<!-- wp:list-item --><li$1>', $content );
+		$content = preg_replace( '/<\/li>/', '</li><!-- /wp:list-item -->', $content );
+
+		$content = preg_replace( '/<ul([^>]*)>/', '<!-- wp:list --><ul$1>', $content );
+		$content = preg_replace( '/<\/ul>/', '</ul><!-- /wp:list -->', $content );
+
+		$content = preg_replace( '/<ol([^>]*)>/', '<!-- wp:list {"ordered":true} --><ol$1>', $content );
+		$content = preg_replace( '/<\/ol>/', '</ol><!-- /wp:list -->', $content );
 
 		return $content;
 	}

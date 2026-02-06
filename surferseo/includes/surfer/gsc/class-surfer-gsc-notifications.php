@@ -7,6 +7,10 @@
 
 namespace SurferSEO\Surfer\GSC;
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 /**
  * Class to handle notifications in wp-admin related to GSC.
  */
@@ -130,7 +134,7 @@ class Surfer_GSC_Notifications {
 			return;
 		}
 
-		if ( ! isset( $_GET['_wpnonce'] ) || ! wp_verify_nonce( $_GET['_wpnonce'], 'surfer_dismiss_notification' ) ) {
+		if ( ! isset( $_GET['_wpnonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ) ), 'surfer_dismiss_notification' ) ) {
 			return;
 		}
 

@@ -8,10 +8,13 @@
 
 namespace SurferSEO\Admin;
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 use SurferSEO\Surferseo;
 use SurferSEO\Forms\Surfer_Form_Config_Ci;
 use SurferSEO\Surfer\Content_Parsers\Parsers_Controller;
-use Elementor\Plugin;
 
 
 /**
@@ -32,9 +35,6 @@ class Surfer_Admin {
 
 		add_action( 'admin_notices', array( $this, 'check_wordfence_application_password_protection' ) );
 		add_action( 'admin_notices', array( $this, 'check_elementor_grid_settings' ) );
-
-		// add_action( 'admin_init', array( $this, 'do_admin_redirects' ) );
-		// add_action( 'admin_menu', array( $this, 'create_wizard_page' ) );
 	}
 
 	/**
@@ -119,8 +119,29 @@ class Surfer_Admin {
 
 	/**
 	 * Enqueue all scripts needed by plugin in wp-admin.
+	 *
+	 * @param string $hook_suffix Admin page hook suffix.
 	 */
-	public function admin_enqueue_scripts() {
+	public function admin_enqueue_scripts( $hook_suffix = '' ) {
+		unset( $hook_suffix );
+
+		if ( ! function_exists( 'get_current_screen' ) ) {
+			return;
+		}
+
+		$screen = get_current_screen();
+		if ( empty( $screen ) ) {
+			return;
+		}
+
+		// These scripts are only needed on Surfer admin pages.
+		$is_surfer_page = ( false !== strpos( (string) $screen->id, 'toplevel_page_surfer' ) )
+			|| ( 0 === strpos( (string) $screen->id, 'surfer_page_' ) );
+
+		if ( ! $is_surfer_page ) {
+			return;
+		}
+
 		$connected        = Surfer()->get_surfer()->is_surfer_connected();
 		$tracking_enabled = Surfer()->get_surfer_tracking()->is_tracking_allowed();
 
@@ -230,11 +251,12 @@ class Surfer_Admin {
 			return;
 		}
 
-		if ( ! class_exists( 'wfConfig' ) ) {
+		if ( ! class_exists( '\wfConfig' ) ) {
 			return;
 		}
 
-		if ( 1 === intval( \wfConfig::get( 'loginSec_disableApplicationPasswords' ) ) ) { // @codingStandardsIgnoreLine
+		$loginsec_disabled_app_passwords = call_user_func( array( '\wfConfig', 'get' ), 'loginSec_disableApplicationPasswords' );
+		if ( 1 === intval( $loginsec_disabled_app_passwords ) ) {
 			$class       = 'notice notice-error';
 			$disable_url = admin_url( 'admin.php?page=WordfenceWAF&subpage=waf_options#wf-option-loginSec-disableApplicationPasswords-label' );
 
@@ -263,14 +285,27 @@ class Surfer_Admin {
 			return;
 		}
 
+		if ( ! class_exists( '\Elementor\Plugin' ) || ! is_callable( array( '\Elementor\Plugin', 'instance' ) ) ) {
+			return;
+		}
+
 		$config_parser = Surfer()->get_surfer_settings()->get_option( 'content-importer', 'default_content_editor', Parsers_Controller::GUTENBERG );
 
 		if ( Parsers_Controller::ELEMENTOR !== $config_parser ) {
 			return;
 		}
 
-		$old_grid_is_active = Plugin::$instance->experiments->is_feature_active( 'container_grid' );
-		$new_grid_is_active = Plugin::$instance->experiments->is_feature_active( 'container' );
+		$elementor = call_user_func( array( '\Elementor\Plugin', 'instance' ) );
+		if ( ! is_object( $elementor ) || ! isset( $elementor->experiments ) || ! is_object( $elementor->experiments ) ) {
+			return;
+		}
+
+		if ( ! is_callable( array( $elementor->experiments, 'is_feature_active' ) ) ) {
+			return;
+		}
+
+		$old_grid_is_active = $elementor->experiments->is_feature_active( 'container_grid' );
+		$new_grid_is_active = $elementor->experiments->is_feature_active( 'container' );
 
 		if ( $old_grid_is_active || $new_grid_is_active ) {
 			return;
@@ -387,7 +422,7 @@ class Surfer_Admin {
 		$content .= 'SITE URL: ' . get_site_url() . PHP_EOL . PHP_EOL;
 		$content .= 'AFTER FILTER SITE URL: ' . apply_filters( 'surfer_api_base_url', get_site_url() ) . PHP_EOL . PHP_EOL;
 		$content .= 'SURFER API KEY: ' . get_option( 'wpsurfer_api_access_key', false ) . PHP_EOL . PHP_EOL;
-		$content .= 'SURFER ORGANIZATION: ' . print_r( get_option( 'surfer_connection_details', null ), true ) . PHP_EOL . PHP_EOL;
+		$content .= 'SURFER ORGANIZATION: ' . join( PHP_EOL, get_option( 'surfer_connection_details', null ) ) . PHP_EOL . PHP_EOL;
 		$content .= 'PERMALINK STRUCTURE: ' . get_option( 'permalink_structure', false ) . PHP_EOL . PHP_EOL;
 		$content .= 'GSC DATA INTERVAL: ' . $interval . PHP_EOL . PHP_EOL;
 		$content .= 'LAST GSC DATA GATHERING: ' . get_option( 'surfer_last_gsc_data_update', false ) . PHP_EOL . PHP_EOL;
@@ -398,7 +433,7 @@ class Surfer_Admin {
 		$content .= 'SURFER VERSION NOW: ' . SURFER_VERSION . PHP_EOL . PHP_EOL;
 		$content .= 'PHP VERSION: ' . phpversion() . PHP_EOL . PHP_EOL;
 		$content .= 'WordPress VERSION: ' . get_bloginfo( 'version' ) . PHP_EOL . PHP_EOL;
-		$content .= 'ACTIVE PLUGINS: ' . print_r( Surfer()->get_surfer_tracking()->get_active_plugins(), true ) . PHP_EOL . PHP_EOL;
+		$content .= 'ACTIVE PLUGINS: ' . join( PHP_EOL, Surfer()->get_surfer_tracking()->get_active_plugins() ) . PHP_EOL . PHP_EOL;
 
 		return $content;
 	}
@@ -407,6 +442,11 @@ class Surfer_Admin {
 	 * Handle admin actions.
 	 */
 	public function handle_admin_actions() {
+
+		if ( ! isset( $_GET['_wpnonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ) ), 'surfer_admin_actions' ) ) {
+			return;
+		}
+
 		if ( ! isset( $_GET['page'] ) || 'surfer' !== $_GET['page'] ) {
 			return;
 		}

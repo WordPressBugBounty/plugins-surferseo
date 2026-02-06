@@ -10,7 +10,9 @@ namespace SurferSEO;
 
 use SurferSEO\Upgrade\SQL\Upgrade_130;
 
-defined( 'ABSPATH' ) || exit;
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
 
 /**
  * Surfer Installer class.

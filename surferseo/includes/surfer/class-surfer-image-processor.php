@@ -8,6 +8,10 @@
 
 namespace SurferSEO\Surfer;
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 /**
  * Handles background image processing.
  */
@@ -70,14 +74,20 @@ class Surfer_Image_Processor {
 
 		global $wpdb;
 
-		$posts = $wpdb->get_results(
-			$wpdb->prepare(
-				"SELECT ID, post_content FROM {$wpdb->posts} 
+		$cache_key = 'image_posts_' . md5( (string) $image_url );
+		$posts     = wp_cache_get( $cache_key, 'surferseo_db' );
+
+		if ( false === $posts ) {
+			$posts = $wpdb->get_results(
+				$wpdb->prepare(
+					"SELECT ID, post_content FROM {$wpdb->posts} 
              WHERE post_content LIKE %s 
              AND post_status IN ('publish', 'draft', 'pending')",
-				'%' . $image_url . '%'
-			)
-		);
+					'%' . $image_url . '%'
+				)
+			);
+			wp_cache_set( $cache_key, $posts, 'surferseo_db', MINUTE_IN_SECONDS );
+		}
 
 		foreach ( $posts as $post ) {
 			$updated_content = str_replace( $image_url, $new_url, $post->post_content );

@@ -7,6 +7,10 @@
 
 namespace SurferSEO\Forms\Validators;
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 /**
  * Validator to check if field is required.
  */

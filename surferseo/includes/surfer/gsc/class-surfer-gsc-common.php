@@ -7,6 +7,10 @@
 
 namespace SurferSEO\Surfer\GSC;
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 trait Surfer_GSC_Common {
 
 	/**
@@ -53,7 +57,18 @@ trait Surfer_GSC_Common {
 	 */
 	public function get_previous_period_date( $post_id ) {
 		global $wpdb;
-		$previous_record = $wpdb->get_results( $wpdb->prepare( 'SELECT p.data_gathering_date FROM ' . $wpdb->prefix . 'surfer_gsc_traffic AS p WHERE p.post_id = %d ORDER BY p.data_gathering_date DESC LIMIT 2', $post_id ) );
+		$cache_key       = 'gsc_prev_period_date_' . absint( $post_id );
+		$previous_record = wp_cache_get( $cache_key, 'surferseo_db' );
+
+		if ( false === $previous_record ) {
+			$previous_record = $wpdb->get_results(
+				$wpdb->prepare(
+					'SELECT p.data_gathering_date FROM ' . $wpdb->prefix . 'surfer_gsc_traffic AS p WHERE p.post_id = %d ORDER BY p.data_gathering_date DESC LIMIT 2',
+					$post_id
+				)
+			);
+			wp_cache_set( $cache_key, $previous_record, 'surferseo_db', 5 * MINUTE_IN_SECONDS );
+		}
 
 		if ( null !== $previous_record && 2 === count( $previous_record ) ) {
 			return $previous_record[1]->data_gathering_date;
