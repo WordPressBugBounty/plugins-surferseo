@@ -73,7 +73,7 @@ class Content_Exporter {
 		$json = file_get_contents( 'php://input' );
 		$data = json_decode( $json );
 
-		if ( ! surfer_validate_custom_request( $data->_surfer_nonce ) ) {
+		if ( ! surfer_validate_custom_request( $data->_surfer_nonce, 'surfer-ajax-nonce', false ) ) {
 			echo wp_json_encode( array( 'message' => 'Security check failed.' ) );
 			wp_die();
 		}
@@ -127,7 +127,7 @@ class Content_Exporter {
 		$json   = file_get_contents( 'php://input' );
 		$data   = json_decode( $json );
 
-		if ( ! surfer_validate_custom_request( $data->_surfer_nonce ) ) {
+		if ( ! surfer_validate_custom_request( $data->_surfer_nonce, 'surfer-ajax-nonce', false ) ) {
 			$logger->log_export( '', '', null, 'Security check failed.' );
 			echo wp_json_encode( array( 'message' => 'Security check failed.' ) );
 			wp_die();
@@ -176,7 +176,7 @@ class Content_Exporter {
 			wp_die();
 
 		} catch ( \Exception $e ) {
-			$logger->log_export( $original_content ?? '', '', null, $e->getMessage() );
+			$logger->log_export( $original_content, '', null, $e->getMessage() );
 			echo wp_json_encode( array( 'message' => 'Export failed: ' . $e->getMessage() ) );
 			wp_die();
 		}
@@ -209,7 +209,7 @@ class Content_Exporter {
 		$json = file_get_contents( 'php://input' );
 		$data = json_decode( $json );
 
-		if ( ! surfer_validate_custom_request( $data->_surfer_nonce ) ) {
+		if ( ! surfer_validate_custom_request( $data->_surfer_nonce, 'surfer-ajax-nonce', false ) ) {
 			echo wp_json_encode( array( 'message' => 'Security check failed.' ) );
 			wp_die();
 		}
@@ -363,7 +363,7 @@ class Content_Exporter {
 		$json = file_get_contents( 'php://input' );
 		$data = json_decode( $json );
 
-		if ( ! surfer_validate_custom_request( $data->_surfer_nonce ) ) {
+		if ( ! surfer_validate_custom_request( $data->_surfer_nonce, 'surfer-ajax-nonce', false ) ) {
 			echo wp_json_encode( array( 'message' => 'Security check failed.' ) );
 			wp_die();
 		}
@@ -379,7 +379,7 @@ class Content_Exporter {
 		$json = file_get_contents( 'php://input' );
 		$data = json_decode( $json );
 
-		if ( ! surfer_validate_custom_request( $data->_surfer_nonce ) ) {
+		if ( ! surfer_validate_custom_request( $data->_surfer_nonce, 'surfer-ajax-nonce', false ) ) {
 			echo wp_json_encode( array( 'message' => 'Security check failed.' ) );
 			wp_die();
 		}
@@ -422,7 +422,7 @@ class Content_Exporter {
 		$json = file_get_contents( 'php://input' );
 		$data = json_decode( $json );
 
-		if ( ! surfer_validate_custom_request( $data->_surfer_nonce ) ) {
+		if ( ! surfer_validate_custom_request( $data->_surfer_nonce, 'surfer-ajax-nonce', false ) ) {
 			echo wp_json_encode( array( 'message' => 'Security check failed.' ) );
 			wp_die();
 		}
@@ -468,7 +468,7 @@ class Content_Exporter {
 	 */
 	public function gather_posts_to_reconnect() {
 
-		if ( ! surfer_validate_ajax_request() || ! check_ajax_referer( 'surfer-ajax-nonce', '_surfer_nonce', false ) ) {
+		if ( ! check_ajax_referer( 'surfer-ajax-nonce', '_surfer_nonce', false ) ) {
 			echo wp_json_encode( array( 'message' => 'Security check failed.' ) );
 			wp_die();
 		}
@@ -502,7 +502,7 @@ class Content_Exporter {
 	 */
 	public function reconnect_posts_with_drafts() {
 
-		if ( ! surfer_validate_ajax_request() || ! check_ajax_referer( 'surfer-ajax-nonce', '_surfer_nonce', false ) ) {
+		if ( ! check_ajax_referer( 'surfer-ajax-nonce', '_surfer_nonce', false ) ) {
 			echo wp_json_encode( array( 'message' => 'Security check failed.' ) );
 			wp_die();
 		}
@@ -582,7 +582,7 @@ class Content_Exporter {
 	 */
 	public function surfer_remove_old_backups() {
 
-		if ( ! surfer_validate_ajax_request() || ! check_ajax_referer( 'surfer-ajax-nonce', '_surfer_nonce', false ) ) {
+		if ( ! check_ajax_referer( 'surfer-ajax-nonce', '_surfer_nonce', false ) ) {
 			echo wp_json_encode( array( 'message' => 'Security check failed.' ) );
 			wp_die();
 		}

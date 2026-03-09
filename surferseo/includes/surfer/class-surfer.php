@@ -661,7 +661,7 @@ class Surfer {
 
 		add_filter( 'posts_where', array( $this, 'search_by_post_title' ), 10, 2 );
 		$query = new \WP_Query( $query_args );
-		remove_filter( 'posts_where', array( $this, 'search_by_post_title' ), 10, 2 );
+		remove_filter( 'posts_where', array( $this, 'search_by_post_title' ), 10 );
 
 		if ( $query->have_posts() ) {
 			while ( $query->have_posts() ) {

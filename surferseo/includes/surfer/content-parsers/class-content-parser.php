@@ -320,7 +320,7 @@ class Content_Parser {
 
 				if ( $internal_links_rel ) {
 					$link->removeAttribute( 'rel' );
-					$link->setAttribute( 'rel', join( ' ', $internal_links_rel ) );
+					$link->setAttribute( 'rel', is_array( $internal_links_rel ) ? join( ' ', $internal_links_rel ) : $internal_links_rel );
 				}
 			}
 
@@ -329,7 +329,7 @@ class Content_Parser {
 
 				if ( $external_links_rel ) {
 					$link->removeAttribute( 'rel' );
-					$link->setAttribute( 'rel', join( ' ', $external_links_rel ) );
+					$link->setAttribute( 'rel', is_array( $external_links_rel ) ? join( ' ', $external_links_rel ) : $external_links_rel );
 				}
 			}
 		}

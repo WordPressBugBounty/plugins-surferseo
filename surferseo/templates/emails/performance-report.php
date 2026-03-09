@@ -9,6 +9,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+$surfer_tracking_is_enabled = isset( $tracking_enabled ) && $tracking_enabled ? $tracking_enabled : false;
+
 ?>
 
 <div style="background-color: #F8FAFB; padding: 40px;">
@@ -126,7 +128,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 						<span style="font-size: 16px; font-weight: 600; line-height: 24px; font-family: Helvetica; color: #E53E3E;">
 							-<?php echo intval( $surfer_post->position_change ); ?>
 						</span>
-						<a href="<?php echo esc_url( the_permalink( $surfer_post->post_id ) ); ?><?php $tracking_enabled ? '?utm_surfer=email-performance-report-top10-drop-click&_wpnonce=' . wp_create_nonce( 'surfer_utm_events' ) : ''; ?>" style="font-size: 16px; font-weight: 400; line-height: 24px; font-family: Helvetica; color: #2B6CB0;"><?php echo esc_html( $surfer_post->post_title ); ?></a>
+						<a href="<?php echo esc_url( the_permalink( $surfer_post->post_id ) ); ?><?php $surfer_tracking_is_enabled ? '?utm_surfer=email-performance-report-top10-drop-click&_wpnonce=' . wp_create_nonce( 'surfer_utm_events' ) : ''; ?>" style="font-size: 16px; font-weight: 400; line-height: 24px; font-family: Helvetica; color: #2B6CB0;"><?php echo esc_html( $surfer_post->post_title ); ?></a>
 					</li>
 					<?php if ( $surfer_i >= 9 ) : ?>
 						<li style="margin-bottom: 16px; font-size: 16px; font-weight: 400; line-height: 24px; font-family: Helvetica;">
@@ -150,7 +152,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 						<span style="font-size: 16px; font-weight: 600; line-height: 24px; font-family: Helvetica; color: #E53E3E;">
 							-<?php echo intval( $surfer_post->position_change ); ?>
 						</span>
-						<a href="<?php echo esc_url( the_permalink( $surfer_post->post_id ) ); ?><?php $tracking_enabled ? '?utm_surfer=email-performance-report-other-drop-click&_wpnonce=' . wp_create_nonce( 'surfer_utm_events' ) : ''; ?>" style="font-size: 16px; font-weight: 400; line-height: 24px; font-family: Helvetica; color: #2B6CB0;"><?php echo esc_html( $surfer_post->post_title ); ?></a>
+						<a href="<?php echo esc_url( the_permalink( $surfer_post->post_id ) ); ?><?php $surfer_tracking_is_enabled ? '?utm_surfer=email-performance-report-other-drop-click&_wpnonce=' . wp_create_nonce( 'surfer_utm_events' ) : ''; ?>" style="font-size: 16px; font-weight: 400; line-height: 24px; font-family: Helvetica; color: #2B6CB0;"><?php echo esc_html( $surfer_post->post_title ); ?></a>
 					</li>
 					<?php if ( $surfer_i >= 4 ) : ?>
 						<li style="margin-bottom: 16px; font-size: 16px; font-weight: 400; line-height: 24px; font-family: Helvetica;">
@@ -174,7 +176,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 						<span style="font-size: 16px; font-weight: 600; line-height: 24px; font-family: Helvetica; color: #E53E3E;">
 							0th
 						</span>
-						<a href="<?php echo esc_url( the_permalink( $surfer_post->post_id ) ); ?><?php $tracking_enabled ? '?utm_surfer=email-performance-report-deindexed-click&_wpnonce=' . wp_create_nonce( 'surfer_utm_events' ) : ''; ?>" style="font-size: 16px; font-weight: 400; line-height: 24px; font-family: Helvetica; color: #2B6CB0;"><?php echo esc_html( $surfer_post->post_title ); ?></a>
+						<a href="<?php echo esc_url( the_permalink( $surfer_post->post_id ) ); ?><?php $surfer_tracking_is_enabled ? '?utm_surfer=email-performance-report-deindexed-click&_wpnonce=' . wp_create_nonce( 'surfer_utm_events' ) : ''; ?>" style="font-size: 16px; font-weight: 400; line-height: 24px; font-family: Helvetica; color: #2B6CB0;"><?php echo esc_html( $surfer_post->post_title ); ?></a>
 					</li>
 					<?php if ( $surfer_i >= 4 ) : ?>
 						<li style="margin-bottom: 16px; font-size: 16px; font-weight: 400; line-height: 24px; font-family: Helvetica;">
@@ -207,7 +209,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 						<span style="font-size: 16px; font-weight: 600; line-height: 24px; font-family: Helvetica; color: #338F61;">
 							+<?php echo intval( abs( $surfer_post->position_change ) ); ?>
 						</span>
-						<a href="<?php echo esc_url( the_permalink( $surfer_post->post_id ) ); ?><?php $tracking_enabled ? '?utm_surfer=email-performance-report-growth-click&_wpnonce=' . wp_create_nonce( 'surfer_utm_events' ) : ''; ?>" style="font-size: 16px; font-weight: 400; line-height: 24px; font-family: Helvetica; color: #2B6CB0;"><?php echo esc_html( $surfer_post->post_title ); ?></a>
+						<a href="<?php echo esc_url( the_permalink( $surfer_post->post_id ) ); ?><?php $surfer_tracking_is_enabled ? '?utm_surfer=email-performance-report-growth-click&_wpnonce=' . wp_create_nonce( 'surfer_utm_events' ) : ''; ?>" style="font-size: 16px; font-weight: 400; line-height: 24px; font-family: Helvetica; color: #2B6CB0;"><?php echo esc_html( $surfer_post->post_title ); ?></a>
 					</li>
 					<?php if ( $surfer_i >= 4 ) : ?>
 						<li style="margin-bottom: 16px; font-size: 16px; font-weight: 400; line-height: 24px; font-family: Helvetica;">
@@ -231,7 +233,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 						<span style="font-size: 16px; font-weight: 600; line-height: 24px; font-family: Helvetica;">
 							<?php echo esc_html( surfer_add_numerical_suffix( $surfer_post->position ) ); ?>
 						</span>
-						<a href="<?php echo esc_url( the_permalink( $surfer_post->post_id ) ); ?><?php $tracking_enabled ? '?utm_surfer=email-performance-report-indexed-click&_wpnonce=' . wp_create_nonce( 'surfer_utm_events' ) : ''; ?>" style="font-size: 16px; font-weight: 400; line-height: 24px; font-family: Helvetica; color: #2B6CB0;"><?php echo esc_html( $surfer_post->post_title ); ?></a>
+						<a href="<?php echo esc_url( the_permalink( $surfer_post->post_id ) ); ?><?php $surfer_tracking_is_enabled ? '?utm_surfer=email-performance-report-indexed-click&_wpnonce=' . wp_create_nonce( 'surfer_utm_events' ) : ''; ?>" style="font-size: 16px; font-weight: 400; line-height: 24px; font-family: Helvetica; color: #2B6CB0;"><?php echo esc_html( $surfer_post->post_title ); ?></a>
 					</li>
 					<?php if ( $surfer_i >= 4 ) : ?>
 						<li style="margin-bottom: 16px; font-size: 16px; font-weight: 400; line-height: 24px; font-family: Helvetica;">
@@ -246,13 +248,13 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 		<?php if ( isset( $posts_drops_in_top_10 ) && isset( $posts_drops_that_dropped_to_next_10 ) && isset( $posts_out_of_index ) && isset( $posts_growth ) && isset( $posts_indexed ) && count( array_merge( $posts_drops_in_top_10, $posts_drops_that_dropped_to_next_10, $posts_out_of_index, $posts_growth, $posts_indexed ) ) > 0 ) : ?>
 			<p style="width: 100%; padding-top: 48px; margin-top: 48px; text-align: center; border-top: 1px dashed #E2E8F0;">
-				<a href="<?php echo esc_url( admin_url( 'admin.php?page=surfer-performance-report' ) ); ?><?php $tracking_enabled ? '&utm_surfer=surfr-email-disable-click&_wpnonce=' . wp_create_nonce( 'surfer_utm_events' ) : ''; ?>" target="_blank" style="padding: 8px 24px; border-radius: 8px; text-decoration: none; background-color: #222A3A; color: #ffffff; font-size: 16px; font-weight: 600; line-height: 24px; font-family: Helvetica;"><?php esc_html_e( 'View this week’s report', 'surferseo' ); ?></a>
+				<a href="<?php echo esc_url( admin_url( 'admin.php?page=surfer-performance-report' ) ); ?><?php $surfer_tracking_is_enabled ? '&utm_surfer=surfr-email-disable-click&_wpnonce=' . wp_create_nonce( 'surfer_utm_events' ) : ''; ?>" target="_blank" style="padding: 8px 24px; border-radius: 8px; text-decoration: none; background-color: #222A3A; color: #ffffff; font-size: 16px; font-weight: 600; line-height: 24px; font-family: Helvetica;"><?php esc_html_e( 'View this week’s report', 'surferseo' ); ?></a>
 			</p>
 		<?php endif; ?>
 
 		<p style="width: 100%; text-align: center; margin-top: 48px; font-size: 16px; font-weight: 400; line-height: 24px; font-family: Helvetica;">
 			<?php esc_html_e( 'Too many updates from Surfer WordPress plugin?', 'surferseo' ); ?>
-			<a href="<?php echo esc_url( admin_url( 'admin.php?page=surfer' ) ); ?><?php $tracking_enabled ? '&utm_surfer=surfr-email-disable-click&_wpnonce=' . wp_create_nonce( 'surfer_utm_events' ) : ''; ?>"><?php esc_html_e( 'Mute them here', 'surferseo' ); ?></a>
+			<a href="<?php echo esc_url( admin_url( 'admin.php?page=surfer' ) ); ?><?php $surfer_tracking_is_enabled ? '&utm_surfer=surfr-email-disable-click&_wpnonce=' . wp_create_nonce( 'surfer_utm_events' ) : ''; ?>"><?php esc_html_e( 'Mute them here', 'surferseo' ); ?></a>
 		</p>
 	</div>
 

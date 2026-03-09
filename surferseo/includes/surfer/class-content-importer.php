@@ -467,7 +467,7 @@ class Content_Importer {
 		$json = file_get_contents( 'php://input' );
 		$data = json_decode( $json );
 
-		if ( ! surfer_validate_custom_request( $data->_surfer_nonce ) ) {
+		if ( ! surfer_validate_custom_request( $data->_surfer_nonce, 'surfer-ajax-nonce', false ) ) {
 			echo wp_json_encode( array( 'message' => 'Security check failed.' ) );
 			wp_die();
 		}

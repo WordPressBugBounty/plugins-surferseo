@@ -175,7 +175,7 @@ class Elementor_Parser extends Content_Parser {
 
 		$execute_for_child = true;
 
-		if ( in_array( $node_type, array( 'ul', 'ol', 'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'h7', 'img', 'blockquote' ), true ) ) {
+		if ( in_array( $node_type, array( 'ul', 'ol', 'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'h7', 'img', 'blockquote', 'table' ), true ) ) {
 			$execute_for_child = false;
 		}
 

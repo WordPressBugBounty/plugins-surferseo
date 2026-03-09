@@ -127,9 +127,9 @@ function surfer_validate_ajax_request( $nonce_name = '_surfer_nonce', $action = 
  * @param string $action Action name.
  * @return bool
  */
-function surfer_validate_custom_request( $nonce_value, $action = 'surfer-ajax-nonce' ) {
+function surfer_validate_custom_request( $nonce_value, $action = 'surfer-ajax-nonce', $require_admin = true ) {
 
-	if ( ! current_user_can( 'manage_options' ) ) {
+	if ( true === $require_admin && ! current_user_can( 'manage_options' ) ) {
 		return false;
 	}
 
