@@ -564,6 +564,12 @@ class Surfer {
 		$args['keywords']         = $request->get_param( 'keywords' );
 		$args['location']         = $request->get_param( 'location' );
 
+		$custom_fields_payload = $request->get_param( 'custom_fields' );
+		if ( empty( $custom_fields_payload ) && isset( $metadata['customFields'] ) ) {
+			$custom_fields_payload = $metadata['customFields'];
+		}
+		$args['custom_fields'] = $this->normalize_custom_fields_for_import( $custom_fields_payload );
+
 		$modification_date = gmdate( 'Y-m-d' );
 		if ( isset( $args['post_id'] ) ) {
 			$modification_date = get_the_modified_time( 'Y-m-d', $args['post_id'] );
@@ -697,6 +703,7 @@ class Surfer {
 					'tags'             => $this->convert_tags_to_surfer_select( $post->ID ),
 					'meta_title'       => $this->get_post_meta_title( $post->ID ),
 					'meta_description' => $this->get_post_meta_description( $post->ID ),
+					'custom_fields'    => $this->get_post_custom_fields_for_export( $post->ID, $post->post_type ),
 				);
 			}
 		}
@@ -776,6 +783,40 @@ class Surfer {
 		}
 
 		return $tags;
+	}
+
+	/**
+	 * Return ACF custom fields for post export in format name => value.
+	 *
+	 * @param int    $post_id - post ID.
+	 * @param string $post_type - post type.
+	 * @return array
+	 */
+	private function get_post_custom_fields_for_export( $post_id, $post_type = '' ) {
+		$fields = $this->surfer_return_acf_fields( $post_type );
+		if ( empty( $fields ) ) {
+			return array();
+		}
+
+		$custom_fields = array();
+		foreach ( $fields as $field ) {
+			if ( empty( $field['name'] ) || empty( $field['key'] ) ) {
+				continue;
+			}
+
+			$value = null;
+			if ( function_exists( 'get_field' ) ) {
+				$value = get_field( $field['key'], $post_id, false );
+			}
+
+			if ( null === $value ) {
+				$value = get_post_meta( $post_id, $field['name'], true );
+			}
+
+			$custom_fields[ $field['name'] ] = $value;
+		}
+
+		return $custom_fields;
 	}
 
 	/**
@@ -903,13 +944,274 @@ class Surfer {
 	 * @return array
 	 */
 	public function list_post_details_options( $request ) {
+		$post_type = $request->get_param( 'post_type' );
+		if ( empty( $post_type ) ) {
+			$post_type = $request->get_param( 'postType' );
+		}
+
+		$post_id = (int) $request->get_param( 'post_id' );
+		if ( $post_id <= 0 ) {
+			$post_id = (int) $request->get_param( 'postId' );
+		}
 
 		return array(
 			'post_types'      => surfer_return_supported_post_types( true ),
 			'post_categories' => $this->surfer_return_categories(),
 			'post_tags'       => $this->surfer_return_tags(),
 			'post_authors'    => $this->surfer_return_users_list(),
+			'custom_fields'   => $this->surfer_return_acf_field_groups_schema( $post_type, $post_id ),
 		);
+	}
+
+	/**
+	 * Returns ACF field groups schema matching the API response expected by Surfer.
+	 *
+	 * @param string $post_type - post type slug.
+	 * @param int    $post_id - post ID.
+	 * @return array
+	 */
+	private function surfer_return_acf_field_groups_schema( $post_type = '', $post_id = 0 ) {
+		if ( ! function_exists( 'acf_get_field_groups' ) || ! function_exists( 'acf_get_fields' ) ) {
+			return array();
+		}
+
+		$args = array();
+		if ( $post_id > 0 ) {
+			$args['post_id'] = $post_id;
+		}
+
+		if ( ! empty( $post_type ) ) {
+			$args['post_type'] = $post_type;
+		}
+
+		$field_groups = ! empty( $args ) ? acf_get_field_groups( $args ) : acf_get_field_groups();
+		$schema       = array();
+
+		if ( empty( $field_groups ) ) {
+			return $schema;
+		}
+
+		foreach ( $field_groups as $group ) {
+			if ( empty( $group['key'] ) ) {
+				continue;
+			}
+
+			$group_key            = $group['key'];
+			$schema[ $group_key ] = array(
+				'label'  => isset( $group['title'] ) ? $group['title'] : null,
+				'name'   => isset( $group['name'] ) ? $group['name'] : null,
+				'fields' => array(),
+			);
+
+			$fields = acf_get_fields( $group_key );
+			if ( ! is_array( $fields ) ) {
+				continue;
+			}
+
+			foreach ( $fields as $field ) {
+				if ( ! is_array( $field ) ) {
+					continue;
+				}
+
+				$field_name                                    = isset( $field['name'] ) ? $field['name'] : '';
+				$schema[ $group_key ]['fields'][ $field_name ] = $field;
+			}
+		}
+
+		return $schema;
+	}
+
+	/**
+	 * Returns list of ACF fields for selected post type.
+	 *
+	 * @param string $post_type - post type slug.
+	 * @return array
+	 */
+	private function surfer_return_acf_fields( $post_type = '' ) {
+		if ( ! function_exists( 'acf_get_field_groups' ) || ! function_exists( 'acf_get_fields' ) ) {
+			return array();
+		}
+
+		$field_groups = array();
+		if ( ! empty( $post_type ) ) {
+			$field_groups = acf_get_field_groups( array( 'post_type' => $post_type ) );
+		}
+
+		if ( empty( $field_groups ) ) {
+			$field_groups = acf_get_field_groups();
+		}
+
+		$fields = array();
+
+		foreach ( $field_groups as $group ) {
+			if ( ! isset( $group['key'] ) ) {
+				continue;
+			}
+
+			$group_fields = acf_get_fields( $group['key'] );
+			if ( ! is_array( $group_fields ) ) {
+				continue;
+			}
+
+			$this->flatten_acf_fields( $group_fields, $fields );
+		}
+
+		$formatted_fields = array();
+		foreach ( $fields as $field ) {
+			$formatted_fields[] = $this->format_acf_field_for_api( $field );
+		}
+
+		return $formatted_fields;
+	}
+
+	/**
+	 * Flatten nested ACF field structures (e.g. repeater/group).
+	 *
+	 * @param array $fields - source fields.
+	 * @param array $result - accumulated flat fields.
+	 * @return void
+	 */
+	private function flatten_acf_fields( $fields, &$result ) {
+		foreach ( $fields as $field ) {
+			if ( ! is_array( $field ) || empty( $field['name'] ) || empty( $field['key'] ) ) {
+				continue;
+			}
+
+			$result[ $field['key'] ] = $field;
+
+			if ( ! empty( $field['sub_fields'] ) && is_array( $field['sub_fields'] ) ) {
+				$this->flatten_acf_fields( $field['sub_fields'], $result );
+			}
+		}
+	}
+
+	/**
+	 * Prepare ACF field data for API response.
+	 *
+	 * @param array $field - ACF field.
+	 * @return array
+	 */
+	private function format_acf_field_for_api( $field ) {
+		$default_value = '';
+		if ( isset( $field['default_value'] ) ) {
+			$default_value = $field['default_value'];
+		}
+
+		return array(
+			'key'           => $field['key'],
+			'label'         => isset( $field['label'] ) ? $field['label'] : '',
+			'name'          => $field['name'],
+			'type'          => isset( $field['type'] ) ? $field['type'] : '',
+			'required'      => ! empty( $field['required'] ),
+			'instructions'  => isset( $field['instructions'] ) ? $field['instructions'] : '',
+			'default_value' => $default_value,
+			'options'       => $this->extract_acf_field_options( $field ),
+		);
+	}
+
+	/**
+	 * Return field options needed to build custom field form in Surfer.
+	 *
+	 * @param array $field - ACF field config.
+	 * @return array
+	 */
+	private function extract_acf_field_options( $field ) {
+		$option_keys = array(
+			'choices',
+			'allow_null',
+			'multiple',
+			'ui',
+			'ajax',
+			'placeholder',
+			'return_format',
+			'min',
+			'max',
+			'step',
+			'prepend',
+			'append',
+			'taxonomy',
+			'field_type',
+			'post_type',
+			'layout',
+			'button_label',
+			'min_length',
+			'max_length',
+			'rows',
+			'new_lines',
+			'maxlength',
+		);
+
+		$options = array();
+		foreach ( $option_keys as $option_key ) {
+			if ( isset( $field[ $option_key ] ) ) {
+				$options[ $option_key ] = $field[ $option_key ];
+			}
+		}
+
+		return $options;
+	}
+
+	/**
+	 * Normalize custom fields payload from request.
+	 * Custom field payloads are keyed by ACF field keys.
+	 *
+	 * @param mixed $fields - custom fields payload.
+	 * @return array
+	 */
+	private function normalize_custom_fields_for_import( $fields ) {
+		if ( is_object( $fields ) ) {
+			$fields = get_object_vars( $fields );
+		}
+
+		if ( ! is_array( $fields ) ) {
+			return array();
+		}
+
+		$normalized = array();
+		foreach ( $fields as $key => $value ) {
+			if ( is_array( $value ) && array_key_exists( 'value', $value ) && isset( $value['key'] ) ) {
+				if ( is_string( $value['key'] ) && '' !== $value['key'] ) {
+					$normalized[ $value['key'] ] = $this->normalize_custom_field_value( $value['value'] );
+				}
+				continue;
+			}
+
+			if ( is_object( $value ) ) {
+				$value_as_array = get_object_vars( $value );
+				if ( array_key_exists( 'value', $value_as_array ) && isset( $value_as_array['key'] ) ) {
+					if ( is_string( $value_as_array['key'] ) && '' !== $value_as_array['key'] ) {
+						$normalized[ $value_as_array['key'] ] = $this->normalize_custom_field_value( $value_as_array['value'] );
+					}
+					continue;
+				}
+			}
+
+			if ( is_string( $key ) ) {
+				$normalized[ $key ] = $this->normalize_custom_field_value( $value );
+			}
+		}
+
+		return $normalized;
+	}
+
+	/**
+	 * Normalize custom field value recursively.
+	 *
+	 * @param mixed $value - custom field value.
+	 * @return mixed
+	 */
+	private function normalize_custom_field_value( $value ) {
+		if ( is_object( $value ) ) {
+			$value = get_object_vars( $value );
+		}
+
+		if ( is_array( $value ) ) {
+			foreach ( $value as $index => $nested_value ) {
+				$value[ $index ] = $this->normalize_custom_field_value( $nested_value );
+			}
+		}
+
+		return $value;
 	}
 
 	/**

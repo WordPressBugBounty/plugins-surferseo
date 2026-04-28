@@ -110,6 +110,10 @@ class Content_Importer {
 				$this->update_aioseo_table( $data['meta_input']['_aioseo_title'], $data['meta_input']['_aioseo_description'], $post_id );
 			}
 
+			if ( ! is_wp_error( $post_id ) && isset( $args['custom_fields'] ) && is_array( $args['custom_fields'] ) ) {
+				$this->save_custom_fields( $post_id, $args['custom_fields'], isset( $data['post_type'] ) ? $data['post_type'] : '' );
+			}
+
 			if ( ! is_wp_error( $post_id ) && isset( $args['draft_id'] ) ) {
 				update_post_meta( $post_id, 'surfer_draft_id', $args['draft_id'] );
 				update_post_meta( $post_id, 'surfer_permalink_hash', isset( $args['permalink_hash'] ) ? $args['permalink_hash'] : '' );
@@ -129,6 +133,114 @@ class Content_Importer {
 			$logger->log_import( $original_content, '', null, $e->getMessage() );
 			return new \WP_Error( 500, 'Surfer import failed: ' . $e->getMessage() );
 		}
+	}
+
+	/**
+	 * Save imported custom fields into ACF (fallback to post meta).
+	 *
+	 * @param int    $post_id - post ID.
+	 * @param array  $custom_fields - fields in format field key => value.
+	 * @param string $post_type - post type.
+	 * @return void
+	 */
+	private function save_custom_fields( $post_id, $custom_fields, $post_type = '' ) {
+		if ( empty( $custom_fields ) ) {
+			return;
+		}
+
+		$acf_fields_by_key = $this->get_acf_fields_by_post_type( $post_type );
+
+		foreach ( $custom_fields as $identifier => $value ) {
+			if ( ! is_string( $identifier ) || '' === $identifier ) {
+				continue;
+			}
+
+			$normalized_value = $this->unslash_custom_field_value( $value );
+
+			if ( isset( $acf_fields_by_key[ $identifier ] ) && function_exists( 'update_field' ) ) {
+				update_field( $identifier, $normalized_value, $post_id );
+			} else {
+				update_post_meta( $post_id, $identifier, $normalized_value );
+			}
+		}
+	}
+
+	/**
+	 * Return ACF fields keyed by unique ACF field key.
+	 *
+	 * @param string $post_type - post type.
+	 * @return array
+	 */
+	private function get_acf_fields_by_post_type( $post_type = '' ) {
+		if ( ! function_exists( 'acf_get_field_groups' ) || ! function_exists( 'acf_get_fields' ) ) {
+			return array();
+		}
+
+		$field_groups = array();
+		if ( ! empty( $post_type ) ) {
+			$field_groups = acf_get_field_groups( array( 'post_type' => $post_type ) );
+		}
+
+		if ( empty( $field_groups ) ) {
+			return array();
+		}
+
+		$fields = array();
+		foreach ( $field_groups as $group ) {
+			if ( ! isset( $group['key'] ) ) {
+				continue;
+			}
+
+			$group_fields = acf_get_fields( $group['key'] );
+			if ( ! is_array( $group_fields ) ) {
+				continue;
+			}
+
+			$this->flatten_acf_fields_by_key( $group_fields, $fields );
+		}
+
+		return $fields;
+	}
+
+	/**
+	 * Flatten nested ACF structures into key => field map.
+	 *
+	 * @param array $source_fields - source fields.
+	 * @param array $flattened_fields - flattened map.
+	 * @return void
+	 */
+	private function flatten_acf_fields_by_key( $source_fields, &$flattened_fields ) {
+		foreach ( $source_fields as $field ) {
+			if ( ! is_array( $field ) || empty( $field['name'] ) || empty( $field['key'] ) ) {
+				continue;
+			}
+
+			$flattened_fields[ $field['key'] ] = $field;
+
+			if ( ! empty( $field['sub_fields'] ) && is_array( $field['sub_fields'] ) ) {
+				$this->flatten_acf_fields_by_key( $field['sub_fields'], $flattened_fields );
+			}
+		}
+	}
+
+	/**
+	 * Remove escaped slashes from imported custom field values.
+	 *
+	 * @param mixed $value - field value.
+	 * @return mixed
+	 */
+	private function unslash_custom_field_value( $value ) {
+		if ( is_string( $value ) ) {
+			return wp_unslash( $value );
+		}
+
+		if ( is_array( $value ) ) {
+			foreach ( $value as $key => $nested_value ) {
+				$value[ $key ] = $this->unslash_custom_field_value( $nested_value );
+			}
+		}
+
+		return $value;
 	}
 
 	/**

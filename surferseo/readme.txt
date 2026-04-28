@@ -4,7 +4,7 @@ Tags: seo, keywords, content writing, content, keyword research
 Requires at least: 6.0
 Requires PHP: 7.4
 Tested up to: 6.9
-Stable tag: 1.6.8.626
+Stable tag: 1.7.0.639
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -87,6 +87,9 @@ It is not a bug, it is a feature. ;)
 4. Select prewritten, drafted, pending, future, and published content  and export it to WordPress with just a few clicks.
 
 == Changelog ==
+
+= 1.7.0 =
+* FEATURE: Support for Advanced Custom Fields export and import
 
 = 1.6.8 =
 * FIX: Improved security & speed
@@ -254,6 +257,9 @@ It is not a bug, it is a feature. ;)
 * FEATURE: Export content from Surfer Content Editor to WordPress.
 
 == Upgrade Notice ==
+
+= 1.7.0 =
+Integration with Advanced Custom Fields (ACF) plugin.
 
 = 1.6.8 =
 Solve import error for Elementor.
