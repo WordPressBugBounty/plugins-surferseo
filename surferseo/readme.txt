@@ -3,8 +3,8 @@ Contributors: surferseo, xingupl, judytafromsurfer
 Tags: seo, keywords, content writing, content, keyword research
 Requires at least: 6.0
 Requires PHP: 7.4
-Tested up to: 6.9
-Stable tag: 1.7.0.639
+Tested up to: 7.1
+Stable tag: 1.7.1.698
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -87,6 +87,14 @@ It is not a bug, it is a feature. ;)
 4. Select prewritten, drafted, pending, future, and published content  and export it to WordPress with just a few clicks.
 
 == Changelog ==
+
+= 1.7.1 =
+* FIX: Missing alt text for images
+* FIX: Occasional disconnection after saving plugin settings
+* FIX: Save space by removing not needed debug logs and tools
+* FIX: Improve image upload process 
+* FIX: Minor UI improvements 
+* FIX: Missing content on some exports
 
 = 1.7.0 =
 * FEATURE: Support for Advanced Custom Fields export and import
@@ -257,6 +265,9 @@ It is not a bug, it is a feature. ;)
 * FEATURE: Export content from Surfer Content Editor to WordPress.
 
 == Upgrade Notice ==
+
+= 1.7.0 =
+Improves images upload and save some disk space.
 
 = 1.7.0 =
 Integration with Advanced Custom Fields (ACF) plugin.

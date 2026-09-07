@@ -100,8 +100,9 @@ class Content_Parser {
 	 */
 	protected function download_img_to_media_library( $image_url, $image_alt, $url_only = true ) {
 
-		$existing_attachment = $this->find_existing_attachment( $image_url );
+		$existing_attachment = surfer_find_attachment_by_original_url( $image_url );
 		if ( $existing_attachment ) {
+			surfer_update_image_alt( $existing_attachment, $image_alt );
 			if ( $url_only ) {
 				return wp_get_attachment_url( $existing_attachment );
 			}
@@ -111,6 +112,8 @@ class Content_Parser {
 			);
 		}
 
+		// The Surfer URL stays in the content only until the background job downloads the
+		// image and replaces it - see Surfer_Image_Processor.
 		if ( 'async' === $this->image_processing_mode ) {
 			$this->queue_image_download( $image_url, $image_alt );
 			if ( $url_only ) {
@@ -124,9 +127,20 @@ class Content_Parser {
 
 		$image_upload = $this->download_image_sync( $image_url );
 
+		// A failed image is replaced with a placeholder instead of being hotlinked to
+		// Surfer - otherwise the post looks fine and nobody notices that the media
+		// library is empty. The reason is logged in download_image_sync().
 		if ( ! $image_upload ) {
-			return $image_url;
+			if ( $url_only ) {
+				return surfer_get_failed_image_url();
+			}
+			return array(
+				'url' => surfer_get_failed_image_url(),
+				'id'  => 0,
+			);
 		}
+
+		surfer_update_image_alt( $image_upload['id'], $image_alt );
 
 		if ( $url_only ) {
 			return $image_upload['url'];
@@ -142,13 +156,23 @@ class Content_Parser {
 	 * @return void
 	 */
 	private function queue_image_download( $image_url, $image_alt ) {
-		$queue   = get_option( 'surfer_image_download_queue', array() );
-		$queue[] = array(
-			'url'       => $image_url,
-			'alt'       => $image_alt,
-			'timestamp' => time(),
-		);
-		update_option( 'surfer_image_download_queue', $queue );
+
+		$lock_acquired = surfer_acquire_lock( 'image_queue' );
+
+		$queue = get_option( 'surfer_image_download_queue', array() );
+
+		if ( ! $this->is_image_queued( $queue, $image_url ) ) {
+			$queue[] = array(
+				'url'       => $image_url,
+				'alt'       => $image_alt,
+				'timestamp' => time(),
+			);
+			update_option( 'surfer_image_download_queue', $queue, false );
+		}
+
+		if ( $lock_acquired ) {
+			surfer_release_lock( 'image_queue' );
+		}
 
 		if ( ! wp_next_scheduled( 'surfer_process_image_queue' ) ) {
 			wp_schedule_single_event( time() + 5, 'surfer_process_image_queue' );
@@ -156,41 +180,37 @@ class Content_Parser {
 	}
 
 	/**
-	 * Find existing attachment by URL.
+	 * Checks if image is already waiting in the queue.
 	 *
+	 * @param array  $queue - current queue.
 	 * @param string $image_url - URL of the image.
-	 * @return int|false
+	 * @return bool
 	 */
-	private function find_existing_attachment( $image_url ) {
-		global $wpdb;
+	private function is_image_queued( $queue, $image_url ) {
 
-		$cache_key     = 'attachment_by_url_' . md5( (string) $image_url );
-		$attachment_id = wp_cache_get( $cache_key, 'surferseo_db' );
-
-		if ( false === $attachment_id ) {
-			$attachment_id = $wpdb->get_var(
-				$wpdb->prepare(
-					"SELECT post_id FROM {$wpdb->postmeta} 
-			 WHERE meta_key = 'surfer_file_original_url' 
-			 AND meta_value LIKE %s",
-					$image_url
-				)
-			);
-			wp_cache_set( $cache_key, $attachment_id, 'surferseo_db', 5 * MINUTE_IN_SECONDS );
+		if ( ! is_array( $queue ) ) {
+			return false;
 		}
 
-		return $attachment_id ? (int) $attachment_id : false;
+		foreach ( $queue as $item ) {
+			if ( isset( $item['url'] ) && $item['url'] === $image_url ) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	/**
 	 * Upload image from Surfer to WordPress and replace src to local one.
 	 *
 	 * @param string $image_url - URL to the image.
-	 * @return int
+	 * @return array|int - array with attachment URL and ID, 0 on failure.
 	 */
 	private function download_image_sync( $image_url ) {
 
 		if ( empty( $image_url ) || ! wp_http_validate_url( $image_url ) ) {
+			surfer_log_image_import_error( $image_url, 'invalid image URL' );
 			return 0;
 		}
 
@@ -198,59 +218,43 @@ class Content_Parser {
 		require_once ABSPATH . 'wp-admin/includes/file.php';
 		require_once ABSPATH . 'wp-admin/includes/image.php';
 
-		$file_name     = basename( $image_url );
-		$tmp_directory = download_url( $image_url );
+		$tmp_file = download_url( $image_url );
 
-		if ( is_wp_error( $tmp_directory ) ) {
+		if ( is_wp_error( $tmp_file ) ) {
+			surfer_log_image_import_error( $image_url, $tmp_file->get_error_message() );
 			return 0;
 		}
 
-		$extension = pathinfo( $image_url, PATHINFO_EXTENSION );
-		if ( empty( $extension ) || '' === $extension ) {
-			$headers = get_headers( $image_url );
-			foreach ( $headers as $header ) {
-				if ( false !== strpos( $header, 'Content-Disposition' ) ) {
-					preg_match( '~filename="(.*?)\.(.*?)"~i', $header, $match );
-					$extension  = $match[2];
-					$file_name .= '.' . $match[2];
-					break;
-				}
-			}
+		$file_name = surfer_resolve_image_file_name( $image_url, $tmp_file );
+
+		// Mime type is intentionally not provided - WordPress detects it from the
+		// downloaded file, so images from URLs without an extension are not rejected.
+		$attachment_id = media_handle_sideload(
+			array(
+				'tmp_name' => $tmp_file,
+				'name'     => $file_name,
+			),
+			0
+		);
+
+		if ( file_exists( $tmp_file ) ) {
+			@unlink( $tmp_file ); // phpcs:ignore
 		}
 
-		$file_array = array(
-			'tmp_name' => $tmp_directory,
-			'name'     => $file_name,
-			'type'     => 'image/' . $extension,
-		);
+		if ( is_wp_error( $attachment_id ) || empty( $attachment_id ) ) {
+			$error_message = is_wp_error( $attachment_id ) ? $attachment_id->get_error_message() : 'attachment was not created';
+			surfer_log_image_import_error( $image_url, $error_message );
+			return 0;
+		}
 
-		$post_data = array(
-			'post_mime_type' => 'image/' . $extension,
-		);
-
-		$attachment_id = media_handle_sideload( $file_array, 0, null, $post_data );
 		update_post_meta( $attachment_id, 'surfer_file_name', $file_name );
 		update_post_meta( $attachment_id, 'surfer_file_original_url', $image_url );
-		@unlink( $tmp_directory ); // phpcs:ignore
+		surfer_forget_attachment_by_original_url( $image_url );
 
 		return array(
 			'url' => wp_get_attachment_url( $attachment_id ),
 			'id'  => $attachment_id,
 		);
-	}
-
-	/**
-	 * Updates alt param for image.
-	 *
-	 * @param int    $image_id - ID of the attachment to update.
-	 * @param string $image_alt - possible alt attribute for image.
-	 * @return void
-	 */
-	private function update_image_alt( $image_id, $image_alt = '' ) {
-
-		if ( '' !== $image_alt ) {
-			update_post_meta( $image_id, '_wp_attachment_image_alt', trim( $image_alt ) );
-		}
 	}
 
 	/**
@@ -264,7 +268,9 @@ class Content_Parser {
 		$attributes = ' ';
 
 		foreach ( $attributes_array as $key => $value ) {
-			$attributes .= $key . '="' . $value . '" ';
+			// Values come decoded from DOMDocument, so they have to be escaped again -
+			// otherwise a quote in alt or title breaks the whole attribute.
+			$attributes .= $key . '="' . esc_attr( $value ) . '" ';
 		}
 		$attributes = rtrim( $attributes );
 

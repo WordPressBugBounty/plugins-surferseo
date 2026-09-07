@@ -23,6 +23,11 @@ use WP_REST_Response;
 class Surfer {
 
 	/**
+	 * Path to the Surfer WordPress API, relative to the Surfer URL.
+	 */
+	private const API_PATH = '/api/v1/wordpress';
+
+	/**
 	 * URL to Surfer.
 	 *
 	 * @var string
@@ -30,7 +35,7 @@ class Surfer {
 	protected $surfer_url = '';
 
 	/**
-	 * URL to Surfer API.
+	 * URL to Surfer API, derived from the Surfer URL.
 	 *
 	 * @var string
 	 */
@@ -42,13 +47,6 @@ class Surfer {
 	 * @var string
 	 */
 	protected $surfer_privacy_policy = 'https://surferseo.com/privacy-policy/';
-
-	/**
-	 * Class that handle importing content from Surfer/GoogleDocs into WordPress.
-	 *
-	 * @var Surfer_Logger
-	 */
-	protected $logger = null;
 
 	/**
 	 * Class that handle importing content from Surfer/GoogleDocs into WordPress.
@@ -132,8 +130,22 @@ class Surfer {
 	 * @return void
 	 */
 	public function resolve_api_url() {
-		$this->surfer_url     = rtrim( Surferseo::get_instance()->get_surfer_settings()->get_option( 'content-importer', 'surfer_url', 'https://app.surferseo.com' ), '/' );
-		$this->surfer_api_url = rtrim( Surferseo::get_instance()->get_surfer_settings()->get_option( 'content-importer', 'surfer_api_url', 'https://app.surferseo.com/api/v1/wordpress/' ), '/' );
+		$this->surfer_url = rtrim( Surferseo::get_instance()->get_surfer_settings()->get_option( 'content-importer', 'surfer_url', 'https://app.surferseo.com' ), '/' );
+
+		/**
+		 * Filters URL of the Surfer WordPress API.
+		 *
+		 * The API always lives under the same host as Surfer itself, so it is derived
+		 * from the Surfer URL instead of being configured separately.
+		 *
+		 * @param string $api_url - URL of the Surfer WordPress API.
+		 * @param string $surfer_url - URL of Surfer.
+		 */
+		$this->surfer_api_url = apply_filters(
+			'surfer_api_url',
+			$this->surfer_url . self::API_PATH,
+			$this->surfer_url
+		);
 	}
 
 	/**
@@ -170,15 +182,6 @@ class Surfer {
 	 */
 	public function get_gsc() {
 		return $this->gsc;
-	}
-
-	/**
-	 * Returns logger object.
-	 *
-	 * @return Surfer_Logger
-	 */
-	public function get_surfer_logger() {
-		return $this->logger;
 	}
 
 	/**
@@ -325,7 +328,6 @@ class Surfer {
 	 * @return void
 	 */
 	private function import_features() {
-		$this->logger            = new Surfer_Logger();
 		$this->content_importer  = new Content_Importer();
 		$this->content_exporter  = new Content_Exporter();
 		$this->keyword_surfer    = new Keyword_Surfer();

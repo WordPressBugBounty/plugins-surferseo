@@ -215,11 +215,24 @@ class Parsers_Controller {
 	/**
 	 * Get image processing mode.
 	 *
+	 * In both modes images end up in the media library. `sync` downloads them during the
+	 * import request, `async` queues them and downloads in batches in the background, so
+	 * an image heavy post does not time out. `auto` picks background processing above
+	 * SURFER_ASYNC_THRESHOLD images.
+	 *
 	 * @param int $image_count - number of images in content.
 	 * @return void
 	 */
 	public function set_image_processing_mode( $image_count ) {
 		$image_processing_mode = Surfer()->get_surfer_settings()->get_option( 'content-importer', 'image_processing_mode', 'auto' );
+
+		/**
+		 * Filters image processing mode for the import.
+		 *
+		 * @param string $image_processing_mode - `sync`, `async` or `auto`.
+		 * @param int    $image_count - number of images in imported content.
+		 */
+		$image_processing_mode = apply_filters( 'surfer_image_processing_mode', $image_processing_mode, $image_count );
 
 		if ( 'async' === $image_processing_mode || ( 'auto' === $image_processing_mode && $image_count > SURFER_ASYNC_THRESHOLD ) ) {
 			$this->image_processing_mode = 'async';

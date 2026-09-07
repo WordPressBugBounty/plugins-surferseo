@@ -16,7 +16,6 @@ use DOMDocument;
 use DOMElement;
 use SurferSEO\Surfer;
 use SurferSEO\Surferseo;
-use SurferSEO\Surfer\Surfer_Logger;
 
 /**
  * Content exporter object.
@@ -123,19 +122,16 @@ class Content_Exporter {
 	 * Makes update content to Surfer.
 	 */
 	public function update_content_editor() {
-		$logger = Surfer()->get_surfer()->get_surfer_logger();
-		$json   = file_get_contents( 'php://input' );
-		$data   = json_decode( $json );
+		$json = file_get_contents( 'php://input' );
+		$data = json_decode( $json );
 
 		if ( ! surfer_validate_custom_request( $data->_surfer_nonce, 'surfer-ajax-nonce', false ) ) {
-			$logger->log_export( '', '', null, 'Security check failed.' );
 			echo wp_json_encode( array( 'message' => 'Security check failed.' ) );
 			wp_die();
 		}
 
 		try {
-			$original_content = isset( $data->content ) ? $data->content : '';
-			$content          = isset( $data->content ) ? wp_kses_post( $this->parse_content_for_surfer( $data->content ) ) : false;
+			$content = isset( $data->content ) ? wp_kses_post( $this->parse_content_for_surfer( $data->content ) ) : false;
 
 			$keywords = isset( $data->keywords ) ? $data->keywords : false;
 
@@ -162,21 +158,16 @@ class Content_Exporter {
 			) = Surfer()->get_surfer()->make_surfer_request( '/import_content_update', $params );
 
 			if ( 200 === $code || 201 === $code ) {
-				$logger->log_export( $original_content, $content, true );
 				update_post_meta( $post_id, 'surfer_last_post_update', round( microtime( true ) * 1000 ) );
 				update_post_meta( $post_id, 'surfer_last_post_update_direction', 'from WordPress to Surfer' );
 
 				$this->save_post_surfer_details( $post_id, $keywords, $location, $draft_id, $permalink_hash );
-			} else {
-				$error_message = isset( $response['message'] ) ? $response['message'] : 'Unknown API error';
-				$logger->log_export( $original_content, $content, $error_message );
 			}
 
 			echo wp_json_encode( $response );
 			wp_die();
 
 		} catch ( \Exception $e ) {
-			$logger->log_export( $original_content, '', null, $e->getMessage() );
 			echo wp_json_encode( array( 'message' => 'Export failed: ' . $e->getMessage() ) );
 			wp_die();
 		}
@@ -326,7 +317,7 @@ class Content_Exporter {
 		$attributes = ' ';
 
 		foreach ( $attributes_array as $key => $value ) {
-			$attributes .= $key . '="' . $value . '" ';
+			$attributes .= $key . '="' . esc_attr( $value ) . '" ';
 		}
 		$attributes = rtrim( $attributes );
 

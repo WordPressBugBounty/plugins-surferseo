@@ -320,13 +320,23 @@ class Gutenberg_Parser extends Content_Parser {
 			$image_alt = $attributes['alt'];
 		}
 
-		$image_url         = $this->download_img_to_media_library( $image_url, $image_alt );
-		$attributes['src'] = $image_url;
+		$image_data        = $this->download_img_to_media_library( $image_url, $image_alt, false );
+		$attributes['src'] = $image_data['url'];
+		$image_id          = (int) $image_data['id'];
+
+		$block_attributes = '';
+		$figure_class     = 'wp-block-image';
+
+		if ( $image_id > 0 ) {
+			$attributes['class'] = 'wp-image-' . $image_id;
+			$block_attributes    = ' {"id":' . $image_id . ',"sizeSlug":"full","linkDestination":"none"}';
+			$figure_class       .= ' size-full';
+		}
 
 		$attributes = $this->glue_attributes( $attributes );
 
-		$content  = '<!-- wp:image -->' . PHP_EOL;
-		$content .= '<figure class="wp-block-image">' . PHP_EOL;
+		$content  = '<!-- wp:image' . $block_attributes . ' -->' . PHP_EOL;
+		$content .= '<figure class="' . $figure_class . '">' . PHP_EOL;
 		$content .= '<img' . $attributes . ' />' . PHP_EOL;
 		$content .= '</figure>' . PHP_EOL;
 		$content .= '<!-- /wp:image -->' . PHP_EOL . PHP_EOL;

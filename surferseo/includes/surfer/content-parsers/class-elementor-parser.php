@@ -390,7 +390,7 @@ class Elementor_Parser extends Content_Parser {
 		$image->id     = $image_id;
 		$image->size   = null;
 		$image->alt    = $image_alt;
-		$image->source = 'library';
+		$image->source = ( $image_id > 0 ) ? 'library' : 'url';
 
 		$settings = new \stdClass();
 		if ( isset( $elementor_styling['image'] ) ) {

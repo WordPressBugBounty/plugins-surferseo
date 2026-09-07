@@ -111,12 +111,40 @@ abstract class Surfer_Form_Element {
 	protected $errors = array();
 
 	/**
+	 * Should the value be saved in the settings array of the module.
+	 *
+	 * Set it to false for fields kept in their own options (like secrets).
+	 *
+	 * @var bool
+	 */
+	protected $store_in_options = true;
+
+	/**
 	 * Basic construct.
 	 *
 	 * @param string $name - name of the field.
 	 */
 	public function __construct( $name ) {
 		$this->name = $name;
+	}
+
+	/**
+	 * Returns information if the value should be saved in the module settings array.
+	 *
+	 * @return bool
+	 */
+	public function get_store_in_options() {
+		return $this->store_in_options;
+	}
+
+	/**
+	 * Sets if the value should be saved in the module settings array.
+	 *
+	 * @param bool $store_in_options - true to store the value with other settings.
+	 * @return void
+	 */
+	public function set_store_in_options( $store_in_options ) {
+		$this->store_in_options = (bool) $store_in_options;
 	}
 
 	/**

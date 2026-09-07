@@ -107,6 +107,42 @@ class Surfer_Installer {
 			// Transfer GSC data to new format.
 			Surfer()->get_surfer()->get_gsc()->transfer_gsc_data_to_new_format();
 		}
+
+		// Import and export logs are gone, their files only take space. Version numbers
+		// are not used here, because the build number in them makes comparisons unreliable.
+		if ( ! get_option( 'surfer_legacy_logs_removed', false ) ) {
+			self::remove_legacy_logs();
+			update_option( 'surfer_legacy_logs_removed', true, false );
+		}
+	}
+
+	/**
+	 * Removes files left after the removed import/export logger.
+	 *
+	 * @return void
+	 */
+	private static function remove_legacy_logs() {
+
+		$upload_dir = wp_upload_dir();
+
+		if ( empty( $upload_dir['basedir'] ) ) {
+			return;
+		}
+
+		$log_dir = trailingslashit( $upload_dir['basedir'] ) . 'surfer-logs/';
+
+		if ( ! is_dir( $log_dir ) ) {
+			return;
+		}
+
+		foreach ( array( 'surfer-import.xml', 'surfer-export.xml' ) as $log_file ) {
+			if ( file_exists( $log_dir . $log_file ) ) {
+				wp_delete_file( $log_dir . $log_file );
+			}
+		}
+
+		// Removes the directory only when it is empty - never touches anything else.
+		@rmdir( $log_dir ); // phpcs:ignore
 	}
 
 	/**

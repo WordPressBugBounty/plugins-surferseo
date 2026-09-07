@@ -461,55 +461,6 @@ class Surfer_Admin {
 			case 'download_debug_data':
 				$this->download_debug_data();
 				break;
-			case 'download_import_logs':
-				$this->download_logs( 'import' );
-				break;
-			case 'download_export_logs':
-				$this->download_logs( 'export' );
-				break;
 		}
-	}
-
-	/**
-	 * Download logs for given operation type.
-	 *
-	 * @param string $operation_type Operation type (import/export).
-	 * @return void
-	 */
-	private function download_logs( $operation_type ) {
-		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_die( esc_html__( 'You do not have sufficient permissions to access this page.', 'surferseo' ) );
-		}
-
-		$logger   = Surfer()->get_surfer()->get_surfer_logger();
-		$log_file = $logger->get_log_file_path( $operation_type );
-
-		if ( ! file_exists( $log_file ) ) {
-			wp_die( esc_html__( 'Log file not found.', 'surferseo' ) );
-		}
-
-		global $wp_filesystem;
-		if ( ! function_exists( 'WP_Filesystem' ) ) {
-			require_once ABSPATH . 'wp-admin/includes/file.php';
-		}
-
-		if ( ! WP_Filesystem() ) {
-			wp_die( esc_html__( 'Could not initialize filesystem.', 'surferseo' ) );
-		}
-
-		$filename     = 'surfer-' . $operation_type . '-logs-' . current_time( 'Y-m-d-H-i-s' ) . '.xml';
-		$file_content = $wp_filesystem->get_contents( $log_file );
-
-		if ( false === $file_content ) {
-			wp_die( esc_html__( 'Could not read log file.', 'surferseo' ) );
-		}
-
-		header( 'Content-Type: application/xml' );
-		header( 'Content-Disposition: attachment; filename="' . $filename . '"' );
-		header( 'Content-Length: ' . filesize( $file_content ) );
-		header( 'Connection: close' );
-
-		echo esc_html( $file_content );
-		exit;
 	}
 }

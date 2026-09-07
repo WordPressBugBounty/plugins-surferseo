@@ -3,14 +3,14 @@
  * Plugin Name: Surfer – WordPress Plugin
  * Plugin URI: https://wordpress.org/plugins/surferseo/
  * Description: Create content that ranks with Surfer in WordPress
- * Version: 1.7.0.639
+ * Version: 1.7.1.698
  * Author: Surfer
  * Author URI: https://surferseo.com
  * License: GPLv2 or later
  * License URI: http://www.gnu.org/licenses/gpl-2.0.html
  * Text Domain: surferseo
  * Requires at least: 6.0
- * Test up to: 6.9
+ * Test up to: 7.1
  * Requires PHP: 7.4
  *
  * @package SurferSEO
@@ -21,7 +21,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 if ( ! defined( 'SURFER_VERSION' ) ) {
-	define( 'SURFER_VERSION', '1.7.0.639' );
+	define( 'SURFER_VERSION', '1.7.1.698' );
 }
 
 if ( ! defined( 'SURFER_PLUGIN_FILE' ) ) {

@@ -52,12 +52,6 @@ use SurferSEO\Surferseo;
 							<a class="surfer-button surfer-button--secondary surfer-button--small" target="_blank" href="<?php echo esc_html( admin_url( 'admin.php?page=surfer&action=download_debug_data&_wpnonce=' . wp_create_nonce( 'surfer_admin_actions' ) ) ); ?>">
 								<?php esc_html_e( 'Download debug data', 'surferseo' ); ?>
 							</a>
-							<a class="surfer-button surfer-button--secondary surfer-button--small" target="_blank" href="<?php echo esc_html( admin_url( 'admin.php?page=surfer&action=download_import_logs&_wpnonce=' . wp_create_nonce( 'surfer_admin_actions' ) ) ); ?>">
-								<?php esc_html_e( 'Download import logs', 'surferseo' ); ?>
-							</a>
-							<a class="surfer-button surfer-button--secondary surfer-button--small" target="_blank" href="<?php echo esc_html( admin_url( 'admin.php?page=surfer&action=download_export_logs&_wpnonce=' . wp_create_nonce( 'surfer_admin_actions' ) ) ); ?>">
-								<?php esc_html_e( 'Download export logs', 'surferseo' ); ?>
-							</a>
 						</div>
 					</div>
 

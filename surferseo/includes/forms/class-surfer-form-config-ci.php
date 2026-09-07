@@ -17,7 +17,6 @@ use SurferSEO\Surferseo;
 use SurferSEO\Forms\Fields\Surfer_Form_Element_Header;
 use SurferSEO\Forms\Fields\Surfer_Form_Element_Text;
 use SurferSEO\Forms\Fields\Surfer_Form_Element_Select;
-use SurferSEO\Forms\Fields\Surfer_Form_Element_Hidden;
 use SurferSEO\Forms\Validators\Validator_Is_Required;
 use SurferSEO\Surfer\GSC\Surfer_GSC_Common;
 use SurferSEO\Surfer\Content_Parsers\Parsers_Controller;
@@ -190,7 +189,7 @@ class Surfer_Form_Config_Ci extends Surfer_Form {
 
 		$field = new Surfer_Form_Element_Select( 'image_processing_mode' );
 		$field->set_label( __( 'Image Processing Mode', 'surferseo' ) );
-		$field->set_hint( __( 'Choose how to handle images during import. Async mode prevents timeouts but images are processed in background.', 'surferseo' ) );
+		$field->set_hint( __( 'Choose how to handle images during import. In both modes images are saved in the Media Library - asynchronous mode downloads them in the background to prevent timeouts, so they appear with a delay.', 'surferseo' ) );
 		$field->add_option( 'sync', __( 'Synchronous (immediate)', 'surferseo' ) );
 		$field->add_option( 'async', __( 'Asynchronous (background)', 'surferseo' ) );
 		$field->add_option( 'auto', __( 'Auto (async for 8+ images)', 'surferseo' ) );
@@ -317,70 +316,62 @@ class Surfer_Form_Config_Ci extends Surfer_Form {
 	 * @return void
 	 */
 	private function render_developer_mode_section() {
-		// phpcs:ignore
-		if ( isset( $_GET['developer_mode'] ) && 1 === intval( $_GET['developer_mode'] ) ) {
-			$field = new Surfer_Form_Element_Header( 'header_dev' );
-			$field->set_label( __( 'Developer options', 'surferseo' ) );
-			$this->add_field( $field );
+
+		// Developer fields are added only in developer mode. Rendering them as hidden
+		// inputs would ship the API key to the browser and - worse - a stale value from
+		// an old page would overwrite the current one on every settings save.
+		if ( ! $this->is_developer_mode() ) {
+			return;
 		}
 
-		// phpcs:ignore
-		if ( isset( $_GET['developer_mode'] ) && 1 === intval( $_GET['developer_mode'] ) ) {
-			$field = new Surfer_Form_Element_Text( 'surfer_url' );
-		} else {
-			$field = new Surfer_Form_Element_Hidden( 'surfer_url' );
-		}
+		$field = new Surfer_Form_Element_Header( 'header_dev' );
+		$field->set_label( __( 'Developer options', 'surferseo' ) );
+		$this->add_field( $field );
+
+		$field = new Surfer_Form_Element_Text( 'surfer_url' );
 		$field->set_label( __( 'Surfer URL', 'surferseo' ) );
-		$field->set_hint( __( '[DEVELOPER FIELD] URL to Surfer. Change only if you are sure what you are doing.', 'surferseo' ) );
+		$field->set_hint( __( '[DEVELOPER FIELD] URL to Surfer, the API URL is derived from it. Change only if you are sure what you are doing.', 'surferseo' ) );
 		$field->set_classes( 'regular-text' );
 		$field->add_validator( new Validator_Is_Required() );
 		$this->add_field( $field );
 
-		// phpcs:ignore
-		if ( isset( $_GET['developer_mode'] ) && 1 === intval( $_GET['developer_mode'] ) ) {
-			$field = new Surfer_Form_Element_Text( 'surfer_api_url' );
-		} else {
-			$field = new Surfer_Form_Element_Hidden( 'surfer_api_url' );
-		}
-		$field->set_label( __( 'Surfer API URL', 'surferseo' ) );
-		$field->set_hint( __( '[DEVELOPER FIELD] URL to Surfer API. Change only if you are sure what you are doing.', 'surferseo' ) );
-		$field->set_classes( 'regular-text' );
-		$field->add_validator( new Validator_Is_Required() );
-		$this->add_field( $field );
-
-		// phpcs:ignore
-		if ( isset( $_GET['developer_mode'] ) && 1 === intval( $_GET['developer_mode'] ) ) {
-			$field = new Surfer_Form_Element_Text( 'wpsurfer_api_access_key' );
-		} else {
-			$field = new Surfer_Form_Element_Hidden( 'wpsurfer_api_access_key' );
-		}
+		$field = new Surfer_Form_Element_Text( 'wpsurfer_api_access_key' );
 		$field->set_label( __( 'Surfer API Key', 'surferseo' ) );
-		$field->set_hint( __( '[DEVELOPER FIELD] API key used to make requests to Surfer API.', 'surferseo' ) );
+		$field->set_hint( __( '[DEVELOPER FIELD] API key used to make requests to Surfer API. Leave empty to keep the current one.', 'surferseo' ) );
 		$field->set_classes( 'regular-text' );
-		$field->set_value( get_option( 'wpsurfer_api_access_key', false ) );
-		$field->add_validator( new Validator_Is_Required() );
+		// The key lives in its own option, so it is neither bound from nor saved into the
+		// module settings - otherwise a leftover copy there would shadow the real value.
+		$field->set_store_in_options( false );
+		$field->set_value( get_option( 'wpsurfer_api_access_key', '' ) );
 		$this->add_field( $field );
 
-		// phpcs:ignore
-		if ( isset( $_GET['developer_mode'] ) && 1 === intval( $_GET['developer_mode'] ) ) {
-			$field = new Surfer_Form_Element_Text( 'surfer_test_gsc_export' );
-			$field->set_label( __( 'Force GSC Data', 'surferseo' ) );
-			$field->set_hint( __( 'On click data from GSC will be gathered.', 'surferseo' ) );
-			$field->set_renderer( array( $this, 'render_test_gsc_export' ) );
-			$this->add_field( $field );
+		$field = new Surfer_Form_Element_Text( 'surfer_test_gsc_export' );
+		$field->set_label( __( 'Force GSC Data', 'surferseo' ) );
+		$field->set_hint( __( 'On click data from GSC will be gathered.', 'surferseo' ) );
+		$field->set_renderer( array( $this, 'render_test_gsc_export' ) );
+		$this->add_field( $field );
 
-			$field = new Surfer_Form_Element_Text( 'surfer_reconnect_posts_with_drafts' );
-			$field->set_label( __( 'Reconnect all posts with Drafts in Surfer', 'surferseo' ) );
-			$field->set_hint( __( 'On click all Surfer posts connected to any draft, will be reconnected (content from WordPress will be exported to Surfer).', 'surferseo' ) );
-			$field->set_renderer( array( $this, 'render_reconnect_posts_with_drafts' ) );
-			$this->add_field( $field );
+		$field = new Surfer_Form_Element_Text( 'surfer_reconnect_posts_with_drafts' );
+		$field->set_label( __( 'Reconnect all posts with Drafts in Surfer', 'surferseo' ) );
+		$field->set_hint( __( 'On click all Surfer posts connected to any draft, will be reconnected (content from WordPress will be exported to Surfer).', 'surferseo' ) );
+		$field->set_renderer( array( $this, 'render_reconnect_posts_with_drafts' ) );
+		$this->add_field( $field );
 
-			$field = new Surfer_Form_Element_Text( 'surfer_remove_old_surfer_backups' );
-			$field->set_label( __( 'Remove old Surfer backups', 'surferseo' ) );
-			$field->set_hint( __( 'On click old Surfer backups (created on post import) will be removed.', 'surferseo' ) );
-			$field->set_renderer( array( $this, 'render_clear_backups' ) );
-			$this->add_field( $field );
-		}
+		$field = new Surfer_Form_Element_Text( 'surfer_remove_old_surfer_backups' );
+		$field->set_label( __( 'Remove old Surfer backups', 'surferseo' ) );
+		$field->set_hint( __( 'On click old Surfer backups (created on post import) will be removed.', 'surferseo' ) );
+		$field->set_renderer( array( $this, 'render_clear_backups' ) );
+		$this->add_field( $field );
+	}
+
+	/**
+	 * Checks if the settings page was opened in developer mode.
+	 *
+	 * @return bool
+	 */
+	private function is_developer_mode() {
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		return isset( $_GET['developer_mode'] ) && 1 === intval( $_GET['developer_mode'] );
 	}
 
 	/**
@@ -649,6 +640,12 @@ class Surfer_Form_Config_Ci extends Surfer_Form {
 			Surfer()->get_surfer_tracking()->track_wp_event( 'config_saved', wp_json_encode( $data ) );
 		}
 
+		$this->maybe_update_api_key();
+
+		// Older versions saved the key with other settings, where it shadowed the real
+		// option when the form was bound. Drop that copy once we get here.
+		Surferseo::get_instance()->get_surfer_settings()->delete_option( $tab, 'wpsurfer_api_access_key' );
+
 		$saved = parent::save( $tab );
 
 		$first_enabled = get_transient( 'surfer_tracking_first_enabled' );
@@ -658,13 +655,42 @@ class Surfer_Form_Config_Ci extends Surfer_Form {
 			set_transient( 'surfer_tracking_first_enabled', true, 60 * 60 * 24 * 30 );
 		}
 
-		// phpcs:ignore
-		if ( isset( $_POST['wpsurfer_api_access_key'] ) ) {
-			// phpcs:ignore
-			update_option( 'wpsurfer_api_access_key', sanitize_text_field( wp_unslash( $_POST['wpsurfer_api_access_key'] ) ) );
+		return $saved;
+	}
+
+	/**
+	 * Saves API key provided manually in developer mode.
+	 *
+	 * Only developer mode can change the key. Previously the key was posted from a hidden
+	 * input on every settings save, so a page opened before connecting (or before the key
+	 * was rotated) overwrote the current key with a stale or empty value and broke the
+	 * connection. An empty value keeps the current key.
+	 *
+	 * @return void
+	 */
+	private function maybe_update_api_key() {
+
+		if ( ! $this->is_developer_mode() ) {
+			return;
 		}
 
-		return $saved;
+		// Nonce is verified before the form is saved, in Surfer_Admin::settings_page().
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing
+		$api_key = isset( $_POST['wpsurfer_api_access_key'] ) ? sanitize_text_field( wp_unslash( $_POST['wpsurfer_api_access_key'] ) ) : '';
+
+		if ( '' === $api_key || get_option( 'wpsurfer_api_access_key', '' ) === $api_key ) {
+			return;
+		}
+
+		// Autoload off, the same way the connection flow saves it.
+		update_option( 'wpsurfer_api_access_key', $api_key, false );
+
+		// The form is rendered after saving, so the field has to show the new key.
+		$field = $this->get_field( 'wpsurfer_api_access_key' );
+
+		if ( $field ) {
+			$field->set_value( $api_key );
+		}
 	}
 
 	/**

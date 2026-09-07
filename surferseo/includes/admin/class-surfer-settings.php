@@ -93,6 +93,26 @@ class Surfer_Settings {
 	}
 
 	/**
+	 * Removes single option from the module settings.
+	 *
+	 * @param string $module - name of the module of settings.
+	 * @param string $option - option name.
+	 * @return bool
+	 */
+	public function delete_option( $module, $option ) {
+
+		$module_options = get_option( $this->prefix . $module, false );
+
+		if ( ! is_array( $module_options ) || ! array_key_exists( $option, $module_options ) ) {
+			return false;
+		}
+
+		unset( $module_options[ $option ] );
+
+		return update_option( $this->prefix . $module, $module_options );
+	}
+
+	/**
 	 * Saves multiple options at oce as array.
 	 *
 	 * @param string $module - name of the module of settings.
@@ -166,7 +186,6 @@ class Surfer_Settings {
 
 		$defaults = array(
 			'surfer_url'                          => 'https://app.surferseo.com',
-			'surfer_api_url'                      => 'https://app.surferseo.com/api/v1/wordpress/',
 			'default_content_editor'              => Parsers_Controller::AUTOMATIC,
 			'default_page_template'               => 'default',
 			'default_elementor_template'          => '',

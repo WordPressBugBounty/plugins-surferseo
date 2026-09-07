@@ -16,7 +16,6 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 use SurferSEO\Surferseo;
 use SurferSEO\Surfer\Content_Parsers\Parsers_Controller;
-use SurferSEO\Surfer\Surfer_Logger;
 
 
 /**
@@ -65,8 +64,6 @@ class Content_Importer {
 	 * @return int|WP_Error
 	 */
 	public function save_data_into_database( $content, $args = array() ) {
-		$logger           = Surfer()->get_surfer()->get_surfer_logger();
-		$original_content = $content;
 
 		$this->increase_limits_for_import();
 
@@ -126,11 +123,9 @@ class Content_Importer {
 
 			$this->content_parser->run_after_post_insert_actions( $post_id );
 
-			$logger->log_import( $original_content, $content, true );
 			return $post_id;
 
 		} catch ( \Exception $e ) {
-			$logger->log_import( $original_content, '', null, $e->getMessage() );
 			return new \WP_Error( 500, 'Surfer import failed: ' . $e->getMessage() );
 		}
 	}
@@ -257,6 +252,10 @@ class Content_Importer {
 			if ( $current_bytes < $required_bytes ) {
 				wp_raise_memory_limit( '512M' );
 			}
+		}
+
+		if ( function_exists( 'set_time_limit' ) && false === strpos( (string) ini_get( 'disable_functions' ), 'set_time_limit' ) ) {
+			@set_time_limit( 300 ); // phpcs:ignore
 		}
 	}
 

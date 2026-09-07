@@ -139,6 +139,12 @@ class Surfer_Form {
 	public function bind( $values = array() ) {
 		if ( is_array( $values ) && count( $values ) > 0 ) {
 			foreach ( $this->get_fields() as $field ) {
+				// Fields kept in their own options set their value themselves, binding
+				// would let a leftover copy in the module settings shadow the real one.
+				if ( ! $field->get_store_in_options() ) {
+					continue;
+				}
+
 				if ( 'checkbox' === $field->get_type() ) {
 					if ( isset( $values[ $field->get_name() ] ) ) {
 						$field->set_value( $values[ $field->get_name() ] );
@@ -433,6 +439,11 @@ class Surfer_Form {
 	private function save_data_into_options( $tab ) {
 		$options = array();
 		foreach ( $this->get_fields() as $field ) {
+			// Fields kept in their own options (secrets) are not duplicated here.
+			if ( ! $field->get_store_in_options() ) {
+				continue;
+			}
+
 			if ( 'checkbox' === $field->get_type() ) {
 				$name = $field->get_name();
 				if ( filter_has_var( INPUT_POST, $name ) ) {
