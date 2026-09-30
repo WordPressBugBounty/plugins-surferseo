@@ -4,7 +4,7 @@ Tags: seo, keywords, content writing, content, keyword research
 Requires at least: 6.0
 Requires PHP: 7.4
 Tested up to: 7.1
-Stable tag: 1.7.1.698
+Stable tag: 1.8.0.744
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -87,6 +87,11 @@ It is not a bug, it is a feature. ;)
 4. Select prewritten, drafted, pending, future, and published content  and export it to WordPress with just a few clicks.
 
 == Changelog ==
+
+= 1.8.0 =
+* FEATURE: Surfer's Content Editor panel iframe now opens right inside the WordPress editor (Gutenberg, Classic, and Elementor)
+* FEATURE: Migrated from old Content Score to new Combined Score
+* FIX: Score not updating before interaction in the Classic editor
 
 = 1.7.1 =
 * FIX: Missing alt text for images
@@ -265,6 +270,9 @@ It is not a bug, it is a feature. ;)
 * FEATURE: Export content from Surfer Content Editor to WordPress.
 
 == Upgrade Notice ==
+
+= 1.8.0 =
+Combined Score support, work with the full Surfer Content Editor iframe panel without leaving WordPress.
 
 = 1.7.0 =
 Improves images upload and save some disk space.

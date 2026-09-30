@@ -52,6 +52,7 @@ class Elementor {
 		wp_enqueue_style( 'surfer-components', Surfer()->get_baseurl() . 'assets/css/components.css', array(), SURFER_VERSION );
 		wp_enqueue_style( 'surfer-styles', Surfer()->get_baseurl() . 'assets/css/surferseo.css', array(), SURFER_VERSION );
 		wp_enqueue_style( 'surfer-elementor-integration', Surfer()->get_baseurl() . 'assets/css/surfer-elementor-integration.css', array(), SURFER_VERSION );
+		wp_enqueue_style( 'surfer-sidebar', Surfer()->get_baseurl() . 'assets/css/surfer-sidebar.css', array(), SURFER_VERSION );
 
 		Surfer()->get_surfer()->enqueue_surfer_react_apps();
 	}
