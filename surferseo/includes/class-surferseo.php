@@ -70,7 +70,7 @@ class Surferseo {
 	/**
 	 * Object to manage Surfer forms.
 	 *
-	 * @var Surfer_Forms
+	 * @var null Never assigned, there is no forms manager class.
 	 */
 	protected $surfer_forms = null;
 
@@ -188,7 +188,7 @@ class Surferseo {
 	/**
 	 * Returns object that manage forms.
 	 *
-	 * @return Surfer_Forms
+	 * @return null Never assigned, there is no forms manager class.
 	 */
 	public function get_surfer_forms() {
 		return $this->surfer_forms;
@@ -215,7 +215,7 @@ class Surferseo {
 	/**
 	 * Returns object that handle tracking features
 	 *
-	 * @return Surfer_Tracking;
+	 * @return Surfer_Tracking
 	 */
 	public function get_surfer_tracking() {
 		return $this->surfer_tracking;
@@ -232,6 +232,7 @@ class Surferseo {
 		$installer = new Surfer_Installer();
 
 		register_activation_hook( SURFER_PLUGIN_FILE, array( $installer, 'install' ) );
+		register_deactivation_hook( SURFER_PLUGIN_FILE, array( $installer, 'deactivate' ) );
 
 		add_action( 'upgrader_process_complete', array( $installer, 'surfer_upgrade_completed' ), 10, 2 );
 	}

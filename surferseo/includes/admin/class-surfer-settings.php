@@ -21,7 +21,7 @@ class Surfer_Settings {
 	/**
 	 * Prefix for WordPress settings.
 	 *
-	 * @var string.
+	 * @var string
 	 */
 	private $prefix = 'surfer_';
 

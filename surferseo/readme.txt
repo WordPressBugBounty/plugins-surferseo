@@ -4,7 +4,7 @@ Tags: seo, keywords, content writing, content, keyword research
 Requires at least: 6.0
 Requires PHP: 7.4
 Tested up to: 7.1
-Stable tag: 1.8.0.744
+Stable tag: 1.8.1.759
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -87,6 +87,22 @@ It is not a bug, it is a feature. ;)
 4. Select prewritten, drafted, pending, future, and published content  and export it to WordPress with just a few clicks.
 
 == Changelog ==
+
+= 1.8.1 =
+* SECURITY: Surfer tools and data in the editor load only for users who can edit the given post
+* SECURITY: The site's Surfer connection key is no longer sent to the browser. We recommend reconnecting your site to Surfer after updating
+* SECURITY: Content Sync actions check the user's permission to edit the synced post; bulk tools on the settings page require an administrator
+* SECURITY: Connection details are always displayed as plain text, and the downloadable debug file shows only a masked connection key
+* SECURITY: The writing guidelines script loads only from Surfer domains
+* SECURITY: Background image import updates only the post the images were imported for
+* SECURITY: Limits for imported content size, number of images and image file size; only image files (JPEG, PNG, GIF, WebP, AVIF) are added to the Media Library
+* CHANGE: Removed the "Remove old Surfer backups" tool from the settings page
+* CHANGE: A Content Editor already connected with another post must be disconnected there before it can be connected to a different post
+* FIX: Writing guidelines not loading in the block editor on WordPress 7.1
+* FIX: Import of large images getting stuck in a loop
+* FIX: Searching Content Editors when updating an existing one blocked typing
+* FIX: Meta title and description were not sent to Surfer when no SEO plugin is active
+* FIX: Surfer panel not showing in Elementor 4
 
 = 1.8.0 =
 * FEATURE: Surfer's Content Editor panel iframe now opens right inside the WordPress editor (Gutenberg, Classic, and Elementor)
@@ -270,6 +286,9 @@ It is not a bug, it is a feature. ;)
 * FEATURE: Export content from Surfer Content Editor to WordPress.
 
 == Upgrade Notice ==
+
+= 1.8.1 =
+Security update with stricter permissions and import limits. After updating, reconnect your site to Surfer.
 
 = 1.8.0 =
 Combined Score support, work with the full Surfer Content Editor iframe panel without leaving WordPress.

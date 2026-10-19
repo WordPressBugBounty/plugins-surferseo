@@ -44,16 +44,6 @@ class Content_Importer {
 
 		$this->image_processor = new Surfer_Image_Processor();
 		$this->content_parser  = new Parsers_Controller();
-
-		add_filter( 'init', array( $this, 'register_ajax_actions' ) );
-	}
-
-	/**
-	 * Register ajax functions for React front-end.
-	 */
-	public function register_ajax_actions() {
-
-		add_action( 'wp_ajax_surfer_pull_and_override_content', array( $this, 'pull_and_override_content' ) );
 	}
 
 	/**
@@ -61,14 +51,19 @@ class Content_Importer {
 	 *
 	 * @param string $content - post content.
 	 * @param array  $args    - array of optional params.
-	 * @return int|WP_Error
+	 * @return int|\WP_Error
 	 */
 	public function save_data_into_database( $content, $args = array() ) {
 
 		$this->increase_limits_for_import();
 
+		// Images left for the background download by the previous import must not be
+		// queued for this post, and their number does not count towards this import.
+		$this->content_parser->clear_pending_images();
+		$this->content_parser->reset_image_limit();
+
 		try {
-			$image_count = substr_count( $content, '<img' );
+			$image_count = (int) preg_match_all( '/<img/i', (string) $content );
 			$this->content_parser->set_image_processing_mode( $image_count );
 			$content = $this->content_parser->parse_content( $content );
 			$content = $this->sanitize_content_for_database( $content );
@@ -103,15 +98,23 @@ class Content_Importer {
 			}
 
 			$post_id = wp_insert_post( $data, true );
+
+			// Nothing is queued and no parser action runs for a post that was not saved -
+			// `absint()` of the error would point them at post 1.
+			if ( is_wp_error( $post_id ) ) {
+				$this->content_parser->clear_pending_images();
+				return $post_id;
+			}
+
 			if ( isset( $data['meta_input']['_aioseo_title'] ) ) {
 				$this->update_aioseo_table( $data['meta_input']['_aioseo_title'], $data['meta_input']['_aioseo_description'], $post_id );
 			}
 
-			if ( ! is_wp_error( $post_id ) && isset( $args['custom_fields'] ) && is_array( $args['custom_fields'] ) ) {
+			if ( isset( $args['custom_fields'] ) && is_array( $args['custom_fields'] ) ) {
 				$this->save_custom_fields( $post_id, $args['custom_fields'], isset( $data['post_type'] ) ? $data['post_type'] : '' );
 			}
 
-			if ( ! is_wp_error( $post_id ) && isset( $args['draft_id'] ) ) {
+			if ( isset( $args['draft_id'] ) ) {
 				update_post_meta( $post_id, 'surfer_draft_id', $args['draft_id'] );
 				update_post_meta( $post_id, 'surfer_permalink_hash', isset( $args['permalink_hash'] ) ? $args['permalink_hash'] : '' );
 				update_post_meta( $post_id, 'surfer_keywords', $args['keywords'] );
@@ -122,6 +125,11 @@ class Content_Importer {
 			}
 
 			$this->content_parser->run_after_post_insert_actions( $post_id );
+
+			// Queued only now, with the post ID - the worker changes only this post. Elementor
+			// finds its images in `run_after_post_insert_actions()`, so it has to run first.
+			$this->image_processor->queue_images( $this->content_parser->get_pending_images(), $post_id );
+			$this->content_parser->clear_pending_images();
 
 			return $post_id;
 
@@ -461,11 +469,7 @@ class Content_Importer {
 	 */
 	private function resolve_post_meta_details( $args, &$data ) {
 
-		$chosen_seo_plugin = Surfer()->get_surfer_settings()->get_option( 'content-importer', 'default_seo_plugin', '' );
-
-		if ( '' === $chosen_seo_plugin ) {
-			$chosen_seo_plugin = $this->find_active_seo_plugin();
-		}
+		$chosen_seo_plugin = surfer_get_seo_meta_target();
 
 		if ( ! isset( $data['meta_input'] ) ) {
 			$data['meta_input'] = array();
@@ -521,26 +525,9 @@ class Content_Importer {
 	}
 
 	/**
-	 * Checks which SEO plugin is active.
-	 */
-	private function find_active_seo_plugin() {
-
-		if ( surfer_check_if_plugins_is_active( 'wordpress-seo/wp-seo.php' ) ) {
-			return 'yoast';
-		} elseif ( surfer_check_if_plugins_is_active( 'all-in-one-seo-pack/all_in_one_seo_pack.php' ) ) {
-			return 'aioseo';
-		} elseif ( surfer_check_if_plugins_is_active( 'seo-by-rank-math/rank-math.php' ) ) {
-			return 'rank_math';
-		}
-
-		return 'surfer';
-	}
-
-
-	/**
 	 * Returns ID of the user with given name.
 	 *
-	 * @param string $login - login of the user.
+	 * @param string|false $login - login of the user.
 	 * @return int
 	 */
 	private function get_user_id_by_login( $login = false ) {
@@ -571,45 +558,6 @@ class Content_Importer {
 		}
 	}
 
-		/**
-		 * Gets post sync status from WordPress and Surfer.
-		 */
-	public function pull_and_override_content() {
-		$json = file_get_contents( 'php://input' );
-		$data = json_decode( $json );
-
-		if ( ! surfer_validate_custom_request( $data->_surfer_nonce, 'surfer-ajax-nonce', false ) ) {
-			echo wp_json_encode( array( 'message' => 'Security check failed.' ) );
-			wp_die();
-		}
-
-		$draft_id            = isset( $data->draft_id ) ? intval( $data->draft_id ) : false;
-		$post_id             = isset( $data->post_id ) ? intval( $data->post_id ) : false;
-		$content_from_surfer = isset( $data->content_from_surfer ) ? $data->content_from_surfer : false;
-
-		$params = array(
-			'draft_id' => $draft_id,
-			'post_id'  => $post_id,
-		);
-
-		list(
-			'code'     => $code,
-			'response' => $response,
-		) = Surfer()->get_surfer()->make_surfer_request( '/update_last_sync_date', $params );
-
-		if ( 200 === $code || 201 === $code ) {
-
-			$args = array(
-				'draft_id' => $draft_id,
-				'post_id'  => $post_id,
-			);
-			$this->save_data_into_database( $content_from_surfer, $args );
-		}
-
-		echo wp_json_encode( $response );
-		wp_die();
-	}
-
 	/**
 	 * Update All in One SEO table with new values.
 	 *
@@ -619,11 +567,7 @@ class Content_Importer {
 	 */
 	private function update_aioseo_table( $meta_title, $meta_description, $post_id ) {
 
-		$chosen_seo_plugin = Surfer()->get_surfer_settings()->get_option( 'content-importer', 'default_seo_plugin', '' );
-
-		if ( '' === $chosen_seo_plugin ) {
-			$chosen_seo_plugin = $this->find_active_seo_plugin();
-		}
+		$chosen_seo_plugin = surfer_get_seo_meta_target();
 
 		if ( 'aioseo' !== $chosen_seo_plugin ) {
 			return;

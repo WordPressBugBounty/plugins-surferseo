@@ -3,7 +3,7 @@
  * Plugin Name: Surfer – WordPress Plugin
  * Plugin URI: https://wordpress.org/plugins/surferseo/
  * Description: Create content that ranks with Surfer in WordPress
- * Version: 1.8.0.744
+ * Version: 1.8.1.759
  * Author: Surfer
  * Author URI: https://surferseo.com
  * License: GPLv2 or later
@@ -21,7 +21,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 if ( ! defined( 'SURFER_VERSION' ) ) {
-	define( 'SURFER_VERSION', '1.8.0.744' );
+	define( 'SURFER_VERSION', '1.8.1.759' );
 }
 
 if ( ! defined( 'SURFER_PLUGIN_FILE' ) ) {
@@ -67,4 +67,10 @@ function surferseo_uninstall_hook() {
 	wp_clear_scheduled_hook( 'surfer_gather_posts_traffic' );
 	wp_clear_scheduled_hook( 'surfer_gather_position_monitor_data' );
 	wp_clear_scheduled_hook( 'surfer_gather_drop_monitor_data' );
+	wp_clear_scheduled_hook( 'surfer_process_image_queue' );
+
+	// Background image import.
+	delete_option( 'surfer_image_download_queue' );
+	delete_option( 'surfer_lock_image_queue_run' );
+	delete_option( 'surfer_lock_image_queue' );
 }

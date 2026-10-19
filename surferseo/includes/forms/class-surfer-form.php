@@ -89,7 +89,7 @@ class Surfer_Form {
 	/**
 	 * Adds field to form fields list.
 	 *
-	 * @param Surfer_Form_Element $field - field object.
+	 * @param \SurferSEO\Forms\Fields\Surfer_Form_Element $field - field object.
 	 * @return void
 	 */
 	public function add_field( $field ) {
@@ -112,7 +112,7 @@ class Surfer_Form {
 	 * Returns selected field element if exists.
 	 *
 	 * @param string $field_name - name of the field.
-	 * @return Surfer_Form_Element|bool
+	 * @return \SurferSEO\Forms\Fields\Surfer_Form_Element|false
 	 */
 	public function get_field( $field_name ) {
 		if ( isset( $this->fields[ $field_name ] ) ) {

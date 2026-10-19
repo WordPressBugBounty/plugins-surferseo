@@ -36,9 +36,36 @@ class Parsers_Controller {
 	protected $image_processing_mode = 'sync';
 
 	/**
+	 * Images of the current import left for the background download, URL => alt text.
+	 *
+	 * Kept here and not in the parser - a new parser is created for every parsed content,
+	 * and Elementor finds its images only after the post is saved.
+	 *
+	 * @var array<string, string>
+	 */
+	protected $pending_images = array();
+
+	/**
+	 * Images of the current import that were downloaded or queued, URL => true.
+	 *
+	 * Counted here for the same reason as pending images - one import can use more than
+	 * one parser instance (Elementor parses its images after the post is saved).
+	 *
+	 * @var array<string, bool>
+	 */
+	protected $limited_images = array();
+
+	/**
+	 * Whether the image limit of the current import was already logged.
+	 *
+	 * @var bool
+	 */
+	protected $image_limit_logged = false;
+
+	/**
 	 * Available parsers.
 	 *
-	 * @var array
+	 * @var string
 	 */
 	public const AUTOMATIC      = '';
 	public const CLASSIC_EDITOR = 'classic';
@@ -81,6 +108,8 @@ class Parsers_Controller {
 
 		$this->load_parser( $config_parser );
 		$this->chosen_parser->set_image_processing_mode( $this->image_processing_mode );
+		$this->chosen_parser->set_pending_image_handler( array( $this, 'add_pending_image' ) );
+		$this->chosen_parser->set_image_limit_handler( array( $this, 'reserve_image' ) );
 	}
 
 	/**
@@ -208,7 +237,108 @@ class Parsers_Controller {
 	 */
 	public function run_after_post_insert_actions( $post_id ) {
 
+		// No parser was used yet (`surfer_skip_default_content_parsing`).
+		if ( null === $this->chosen_parser ) {
+			return;
+		}
+
 		$this->chosen_parser->run_after_post_insert_actions( $post_id );
+	}
+
+	/**
+	 * Remembers an image left for the background download.
+	 *
+	 * The first alt text of the image is kept, the same as in the queue.
+	 *
+	 * @param string $image_url - URL of the image.
+	 * @param string $image_alt - alt text of the image.
+	 * @return void
+	 */
+	public function add_pending_image( $image_url, $image_alt ) {
+
+		$image_url = (string) $image_url;
+
+		if ( '' === $image_url || array_key_exists( $image_url, $this->pending_images ) ) {
+			return;
+		}
+
+		$this->pending_images[ $image_url ] = (string) $image_alt;
+	}
+
+	/**
+	 * Returns images of the current import left for the background download.
+	 *
+	 * @return array<int, array{url: string, alt: string}>
+	 */
+	public function get_pending_images() {
+
+		$images = array();
+
+		foreach ( $this->pending_images as $image_url => $image_alt ) {
+			$images[] = array(
+				'url' => (string) $image_url,
+				'alt' => $image_alt,
+			);
+		}
+
+		return $images;
+	}
+
+	/**
+	 * Forgets images of the previous import.
+	 *
+	 * @return void
+	 */
+	public function clear_pending_images() {
+		$this->pending_images = array();
+	}
+
+	/**
+	 * Checks if one more image of the current import may be downloaded or queued.
+	 *
+	 * Only images that need a download are counted (images already in the media library
+	 * never reach this check), and every URL is counted once. Images over the limit keep
+	 * their Surfer URLs - the limit is logged once per import.
+	 *
+	 * @param string $image_url - URL of the image.
+	 * @return bool
+	 */
+	public function reserve_image( $image_url ) {
+
+		$image_url = (string) $image_url;
+
+		// Invalid images are not downloaded at all, there is nothing to count.
+		if ( '' === $image_url || isset( $this->limited_images[ $image_url ] ) ) {
+			return true;
+		}
+
+		$limits = surfer_get_import_limits();
+
+		if ( count( $this->limited_images ) >= $limits['images_per_import'] ) {
+			if ( ! $this->image_limit_logged ) {
+				$this->image_limit_logged = true;
+				surfer_log_image_import_error(
+					$image_url,
+					'limit of ' . $limits['images_per_import'] . ' images per import reached, this and further images keep their remote URLs'
+				);
+			}
+
+			return false;
+		}
+
+		$this->limited_images[ $image_url ] = true;
+
+		return true;
+	}
+
+	/**
+	 * Starts counting images of a new import.
+	 *
+	 * @return void
+	 */
+	public function reset_image_limit() {
+		$this->limited_images     = array();
+		$this->image_limit_logged = false;
 	}
 
 

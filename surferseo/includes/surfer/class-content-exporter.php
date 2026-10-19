@@ -41,19 +41,17 @@ class Content_Exporter {
 		add_filter( 'wp_ajax_surfer_update_content_editor', array( $this, 'update_content_editor' ) );
 		add_filter( 'wp_ajax_surfer_remove_post_draft_connection', array( $this, 'remove_post_draft_connection' ) );
 		add_filter( 'wp_ajax_surfer_check_draft_status', array( $this, 'check_draft_status' ) );
-		add_filter( 'wp_ajax_surfer_get_locations', array( $this, 'get_locations' ) );
 		add_filter( 'wp_ajax_surfer_get_post_sync_status', array( $this, 'get_post_sync_status' ) );
 
 		add_filter( 'wp_ajax_surfer_gather_posts_to_reconnect', array( $this, 'gather_posts_to_reconnect' ) );
 		add_filter( 'wp_ajax_surfer_reconnect_posts_with_drafts', array( $this, 'reconnect_posts_with_drafts' ) );
-		add_action( 'wp_ajax_surfer_remove_old_backups', array( $this, 'surfer_remove_old_backups' ) );
 	}
 
 	/**
 	 * Add export content button to post/page list.
 	 *
 	 * @param array   $actions - actions array.
-	 * @param WP_Post $post - post object.
+	 * @param \WP_Post $post - post object.
 	 */
 	public function add_export_content_button_to_posts_list( $actions, $post ) {
 		$draft_id = get_post_meta( $post->ID, 'surfer_draft_id', true );
@@ -66,13 +64,88 @@ class Content_Exporter {
 	}
 
 	/**
+	 * Returns ID of the post from the request, when the current user is allowed to sync it with Surfer.
+	 *
+	 * Request is denied when `post_id` is missing, the post does not exist, its type is not
+	 * supported by Surfer, the user cannot edit it, or the nonce is wrong.
+	 *
+	 * @param object|null $data - decoded JSON body of the request.
+	 * @return int - ID of the post, 0 when the request is not allowed.
+	 */
+	private function get_authorized_post_id( $data ) {
+
+		$nonce   = isset( $data->_surfer_nonce ) ? $data->_surfer_nonce : '';
+		$post_id = isset( $data->post_id ) ? intval( $data->post_id ) : 0;
+		$post    = $post_id > 0 ? get_post( $post_id ) : null;
+
+		if ( ! $post instanceof \WP_Post || ! in_array( $post->post_type, surfer_return_supported_post_types(), true ) ) {
+			return 0;
+		}
+
+		if ( ! surfer_validate_custom_request( $nonce, 'surfer-ajax-nonce', 'edit_post', $post->ID ) ) {
+			return 0;
+		}
+
+		return $post->ID;
+	}
+
+	/**
+	 * Returns ID of the Surfer draft connected with the post.
+	 *
+	 * Handlers that read or change an existing connection use this value only - a `draft_id`
+	 * sent in the request is ignored, so a user who can edit one post cannot reach a draft
+	 * connected with another post.
+	 *
+	 * @param int $post_id - ID of the post.
+	 * @return int - ID of the draft, 0 when the post is not connected.
+	 */
+	private function get_connected_draft_id( $post_id ) {
+
+		$draft_id = intval( get_post_meta( $post_id, 'surfer_draft_id', true ) );
+
+		return $draft_id > 0 ? $draft_id : 0;
+	}
+
+	/**
+	 * Checks if another post is connected with the Surfer draft.
+	 *
+	 * Every post type and every status except trash (and auto-draft and revisions, which never
+	 * get the connection) counts - a draft, pending, scheduled or private post keeps
+	 * its connection the same way a published one does. A trashed post does not block the draft,
+	 * so it can be connected with a post that replaces the trashed one.
+	 *
+	 * @param int $draft_id - ID of the Surfer draft.
+	 * @param int $post_id - ID of the post that should be skipped.
+	 * @return bool
+	 */
+	private function draft_is_connected_with_another_post( $draft_id, $post_id ) {
+
+		$posts = get_posts(
+			array(
+				'post_type'        => array_values( get_post_types() ),
+				'post_status'      => array( 'publish', 'future', 'draft', 'pending', 'private' ),
+				'post__not_in'     => array( $post_id ),
+				'numberposts'      => 1,
+				'fields'           => 'ids',
+				'meta_query'       => array(
+					array(
+						'key'   => 'surfer_draft_id',
+						'value' => (string) $draft_id,
+					),
+				),
+			)
+		);
+
+		return ! empty( $posts );
+	}
+
+	/**
 	 * Makes export content to Surfer.
 	 */
 	public function create_content_editor() {
-		$json = file_get_contents( 'php://input' );
-		$data = json_decode( $json );
+		$data = surfer_get_json_request_body();
 
-		if ( ! surfer_validate_custom_request( $data->_surfer_nonce, 'surfer-ajax-nonce', false ) ) {
+		if ( 0 === $this->get_authorized_post_id( $data ) ) {
 			echo wp_json_encode( array( 'message' => 'Security check failed.' ) );
 			wp_die();
 		}
@@ -122,11 +195,26 @@ class Content_Exporter {
 	 * Makes update content to Surfer.
 	 */
 	public function update_content_editor() {
-		$json = file_get_contents( 'php://input' );
-		$data = json_decode( $json );
+		$data    = surfer_get_json_request_body();
+		$post_id = $this->get_authorized_post_id( $data );
 
-		if ( ! surfer_validate_custom_request( $data->_surfer_nonce, 'surfer-ajax-nonce', false ) ) {
+		if ( 0 === $post_id ) {
 			echo wp_json_encode( array( 'message' => 'Security check failed.' ) );
+			wp_die();
+		}
+
+		// The draft from the request can be the one already connected with this post, or
+		// a draft to connect with a post that has none - never a draft of another post.
+		$draft_id           = isset( $data->draft_id ) ? intval( $data->draft_id ) : 0;
+		$connected_draft_id = $this->get_connected_draft_id( $post_id );
+
+		if ( $draft_id < 1 || ( $connected_draft_id > 0 && $connected_draft_id !== $draft_id ) ) {
+			echo wp_json_encode( array( 'message' => 'Security check failed.' ) );
+			wp_die();
+		}
+
+		if ( $this->draft_is_connected_with_another_post( $draft_id, $post_id ) ) {
+			echo wp_json_encode( array( 'message' => 'This Content Editor is already connected with another post. Disconnect it there first.' ) );
 			wp_die();
 		}
 
@@ -135,8 +223,6 @@ class Content_Exporter {
 
 			$keywords = isset( $data->keywords ) ? $data->keywords : false;
 
-			$draft_id         = isset( $data->draft_id ) ? intval( $data->draft_id ) : false;
-			$post_id          = isset( $data->post_id ) ? intval( $data->post_id ) : false;
 			$permalink_hash   = isset( $data->permalink_hash ) ? sanitize_text_field( wp_unslash( $data->permalink_hash ) ) : false;
 			$keywords         = is_array( $data->keywords ) ? array_map( 'sanitize_text_field', $data->keywords ) : sanitize_text_field( wp_unslash( $data->keywords ) );
 			$location         = isset( $data->location ) ? sanitize_text_field( wp_unslash( $data->location ) ) : false;
@@ -197,16 +283,20 @@ class Content_Exporter {
 	 * Allows to check draft status.
 	 */
 	public function check_draft_status() {
-		$json = file_get_contents( 'php://input' );
-		$data = json_decode( $json );
+		$data    = surfer_get_json_request_body();
+		$post_id = $this->get_authorized_post_id( $data );
 
-		if ( ! surfer_validate_custom_request( $data->_surfer_nonce, 'surfer-ajax-nonce', false ) ) {
+		if ( 0 === $post_id ) {
 			echo wp_json_encode( array( 'message' => 'Security check failed.' ) );
 			wp_die();
 		}
 
-		$draft_id = isset( $data->draft_id ) ? intval( $data->draft_id ) : false;
-		$post_id  = isset( $data->post_id ) ? intval( $data->post_id ) : false;
+		$draft_id = $this->get_connected_draft_id( $post_id );
+
+		if ( 0 === $draft_id ) {
+			echo wp_json_encode( array( 'message' => 'Post is not connected with a Surfer draft.' ) );
+			wp_die();
+		}
 
 		$params = array(
 			'draft_id' => $draft_id,
@@ -260,7 +350,7 @@ class Content_Exporter {
 	/**
 	 * Function iterates by HTML tags in provided content.
 	 *
-	 * @param DOMDocument $parent_node - node to parse.
+	 * @param \DOMDocument $parent_node - node to parse.
 	 * @param string      $content     - reference to content variable, to store Gutenberg output.
 	 * @return void
 	 */
@@ -291,6 +381,7 @@ class Content_Exporter {
 				$content .= '<' . $node->nodeName . '>' . $node_content . '</' . $node->nodeName . '>' . PHP_EOL;
 				// @codingStandardsIgnoreLine
 			} elseif ( 'img' === $node->nodeName ) { // @codingStandardsIgnoreLine
+				/** @var \DOMElement $node An <img> node is always an element. */
 				$attributes           = array();
 				$attributes['src']    = $node->getAttribute( 'src' );
 				$attributes['alt']    = $node->getAttribute( 'alt' );
@@ -327,7 +418,7 @@ class Content_Exporter {
 	/**
 	 * Extract inner HTML for provided node.
 	 *
-	 * @param DOMElement $node - node element to parse.
+	 * @param \DOMElement $node - node element to parse.
 	 * @return string
 	 */
 	private function get_inner_html( $node ) {
@@ -348,35 +439,29 @@ class Content_Exporter {
 	}
 
 	/**
-	 * Returns available locations.
-	 */
-	public function get_locations() {
-		$json = file_get_contents( 'php://input' );
-		$data = json_decode( $json );
-
-		if ( ! surfer_validate_custom_request( $data->_surfer_nonce, 'surfer-ajax-nonce', false ) ) {
-			echo wp_json_encode( array( 'message' => 'Security check failed.' ) );
-			wp_die();
-		}
-
-		echo wp_json_encode( Surfer()->get_surfer()->surfer_hardcoded_location() );
-		wp_die();
-	}
-
-	/**
 	 * Removes a draft connection.
 	 */
 	public function remove_post_draft_connection() {
-		$json = file_get_contents( 'php://input' );
-		$data = json_decode( $json );
+		$data    = surfer_get_json_request_body();
+		$post_id = $this->get_authorized_post_id( $data );
 
-		if ( ! surfer_validate_custom_request( $data->_surfer_nonce, 'surfer-ajax-nonce', false ) ) {
+		if ( 0 === $post_id ) {
 			echo wp_json_encode( array( 'message' => 'Security check failed.' ) );
 			wp_die();
 		}
 
-		$post_id  = isset( $data->post_id ) ? intval( $data->post_id ) : false;
-		$draft_id = isset( $data->draft_id ) ? intval( $data->draft_id ) : false;
+		$draft_id = $this->get_connected_draft_id( $post_id );
+
+		// Nothing to disconnect in Surfer - the answer has the same shape as a failed disconnection.
+		if ( 0 === $draft_id ) {
+			echo wp_json_encode(
+				array(
+					'connection_removed' => false,
+					'surfer_response'    => array( 'message' => 'Post is not connected with a Surfer draft.' ),
+				)
+			);
+			wp_die();
+		}
 
 		$params = array(
 			'draft_id'   => $draft_id,
@@ -384,10 +469,20 @@ class Content_Exporter {
 			'url'        => apply_filters( 'surfer_api_base_url', get_site_url() ),
 		);
 
-		list(
-			'code'     => $code,
-			'response' => $response,
-		) = Surfer()->get_surfer()->make_surfer_request( '/disconnect_draft', $params );
+		$result   = Surfer()->get_surfer()->make_surfer_request( '/disconnect_draft', $params );
+		$code     = isset( $result['code'] ) ? $result['code'] : null;
+		$response = isset( $result['response'] ) ? $result['response'] : $result;
+
+		// Connection is kept in WordPress until Surfer confirms it was removed (page not connected - no `code`).
+		if ( 200 !== $code && 201 !== $code ) {
+			echo wp_json_encode(
+				array(
+					'connection_removed' => false,
+					'surfer_response'    => $response,
+				)
+			);
+			wp_die();
+		}
 
 		delete_post_meta( $post_id, 'surfer_draft_id' );
 		delete_post_meta( $post_id, 'surfer_scrape_ready' );
@@ -410,16 +505,20 @@ class Content_Exporter {
 	 * Gets post sync status from WordPress and Surfer.
 	 */
 	public function get_post_sync_status() {
-		$json = file_get_contents( 'php://input' );
-		$data = json_decode( $json );
+		$data    = surfer_get_json_request_body();
+		$post_id = $this->get_authorized_post_id( $data );
 
-		if ( ! surfer_validate_custom_request( $data->_surfer_nonce, 'surfer-ajax-nonce', false ) ) {
+		if ( 0 === $post_id ) {
 			echo wp_json_encode( array( 'message' => 'Security check failed.' ) );
 			wp_die();
 		}
 
-		$draft_id = isset( $data->draft_id ) ? intval( $data->draft_id ) : false;
-		$post_id  = isset( $data->post_id ) ? intval( $data->post_id ) : false;
+		$draft_id = $this->get_connected_draft_id( $post_id );
+
+		if ( 0 === $draft_id ) {
+			echo wp_json_encode( array( 'message' => 'Post is not connected with a Surfer draft.' ) );
+			wp_die();
+		}
 
 		$params = array(
 			'draft_id' => $draft_id,
@@ -459,7 +558,7 @@ class Content_Exporter {
 	 */
 	public function gather_posts_to_reconnect() {
 
-		if ( ! check_ajax_referer( 'surfer-ajax-nonce', '_surfer_nonce', false ) ) {
+		if ( ! surfer_validate_ajax_request() ) {
 			echo wp_json_encode( array( 'message' => 'Security check failed.' ) );
 			wp_die();
 		}
@@ -493,7 +592,7 @@ class Content_Exporter {
 	 */
 	public function reconnect_posts_with_drafts() {
 
-		if ( ! check_ajax_referer( 'surfer-ajax-nonce', '_surfer_nonce', false ) ) {
+		if ( ! surfer_validate_ajax_request() ) {
 			echo wp_json_encode( array( 'message' => 'Security check failed.' ) );
 			wp_die();
 		}
@@ -566,33 +665,5 @@ class Content_Exporter {
 		}
 
 		return $drafts;
-	}
-
-	/**
-	 * Removes old backups.
-	 */
-	public function surfer_remove_old_backups() {
-
-		if ( ! check_ajax_referer( 'surfer-ajax-nonce', '_surfer_nonce', false ) ) {
-			echo wp_json_encode( array( 'message' => 'Security check failed.' ) );
-			wp_die();
-		}
-
-		$posts = get_posts(
-			array(
-				'post_type'   => 'post',
-				'post_status' => array( 'surfer-backup' ),
-				'numberposts' => -1,
-			)
-		);
-
-		foreach ( $posts as $post ) {
-			wp_delete_post( $post->ID, true );
-		}
-
-		$response = count( $posts ) . ' of old backups removed.';
-
-		echo wp_json_encode( $response );
-		wp_die();
 	}
 }

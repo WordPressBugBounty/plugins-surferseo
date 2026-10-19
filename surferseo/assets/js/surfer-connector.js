@@ -30,10 +30,10 @@ jQuery(function ($) {
           $('.surfer-connected').show()
           $('.surfer-not-connected').hide()
 
-          $('#surfer-organization-name').html(
+          $('#surfer-organization-name').text(
             response.details.organization_name
           )
-          $('#surfer-via-email').html(response.details.via_email)
+          $('#surfer-via-email').text(response.details.via_email)
 
           clearInterval(connection_check)
         }

@@ -33,6 +33,16 @@ class Surfer_Image_Processor {
 	private const LEASE_TIME = 300;
 
 	/**
+	 * How many times queueing images tries to get the queue lock.
+	 */
+	private const QUEUE_LOCK_ATTEMPTS = 5;
+
+	/**
+	 * Pause between attempts to get the queue lock, in microseconds.
+	 */
+	private const QUEUE_LOCK_RETRY_DELAY = 100000;
+
+	/**
 	 * Constructor.
 	 */
 	public function __construct() {
@@ -57,6 +67,138 @@ class Surfer_Image_Processor {
 		}
 
 		wp_schedule_single_event( time() + 5, 'surfer_process_image_queue' );
+	}
+
+	/**
+	 * Queues images of a saved post for the background download.
+	 *
+	 * Called by the importer only after the post is saved, so the worker can change this
+	 * post only - never another post that happens to use the same URL. When the image is
+	 * already queued (another post uses it), the post is added to that entry and the alt
+	 * text of the first entry is kept. A new image that does not fit in the queue
+	 * (`queue_length` limit) keeps its Surfer URL.
+	 *
+	 * @param array<int, array{url: string, alt: string}> $images - images left for the background download.
+	 * @param int                                          $post_id - ID of the saved post.
+	 * @return void
+	 */
+	public function queue_images( $images, $post_id ) {
+
+		$post_id = (int) $post_id;
+
+		if ( empty( $images ) || $post_id < 1 ) {
+			return;
+		}
+
+		if ( ! $this->acquire_queue_lock_with_retries() ) {
+			// The post keeps the Surfer URL - better than losing an entry of another import
+			// by writing the queue without the lock.
+			foreach ( $images as $image ) {
+				surfer_log_image_import_error( $image['url'], 'image queue is locked, image of post ' . $post_id . ' was not queued' );
+			}
+
+			return;
+		}
+
+		$queue = get_option( 'surfer_image_download_queue', array() );
+
+		if ( ! is_array( $queue ) ) {
+			$queue = array();
+		}
+
+		$queue        = array_values( $queue );
+		$keys_by_urls = array();
+		$queue_length = surfer_get_import_limits()['queue_length'];
+		$not_queued   = array();
+
+		foreach ( $queue as $key => $item ) {
+			if ( isset( $item['url'] ) && ! isset( $keys_by_urls[ $item['url'] ] ) ) {
+				$keys_by_urls[ $item['url'] ] = $key;
+			}
+		}
+
+		foreach ( $images as $image ) {
+			if ( empty( $image['url'] ) ) {
+				continue;
+			}
+
+			if ( isset( $keys_by_urls[ $image['url'] ] ) ) {
+				$key      = $keys_by_urls[ $image['url'] ];
+				$post_ids = $this->get_item_post_ids( $queue[ $key ] );
+
+				if ( ! in_array( $post_id, $post_ids, true ) ) {
+					$post_ids[] = $post_id;
+				}
+
+				$queue[ $key ]['post_ids'] = $post_ids;
+				continue;
+			}
+
+			if ( count( $queue ) >= $queue_length ) {
+				$not_queued[] = $image['url'];
+				continue;
+			}
+
+			$queue[] = array(
+				'url'       => $image['url'],
+				'alt'       => isset( $image['alt'] ) ? (string) $image['alt'] : '',
+				'timestamp' => time(),
+				'post_ids'  => array( $post_id ),
+			);
+
+			$keys_by_urls[ $image['url'] ] = count( $queue ) - 1;
+		}
+
+		update_option( 'surfer_image_download_queue', $queue, false );
+		surfer_release_lock( 'image_queue' );
+
+		foreach ( $not_queued as $image_url ) {
+			surfer_log_image_import_error( $image_url, 'image queue is full (' . $queue_length . ' images), image of post ' . $post_id . ' keeps its remote URL' );
+		}
+
+		$this->schedule_next_run( 5 );
+	}
+
+	/**
+	 * Tries to get the queue lock a few times, waiting a moment between attempts.
+	 *
+	 * @return bool - true when the lock was acquired.
+	 */
+	private function acquire_queue_lock_with_retries() {
+
+		for ( $attempt = 1; $attempt <= self::QUEUE_LOCK_ATTEMPTS; $attempt++ ) {
+			if ( surfer_acquire_lock( 'image_queue' ) ) {
+				return true;
+			}
+
+			if ( $attempt < self::QUEUE_LOCK_ATTEMPTS ) {
+				usleep( self::QUEUE_LOCK_RETRY_DELAY );
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * Returns IDs of posts the queue entry was created for.
+	 *
+	 * @param array $item - queue entry.
+	 * @return int[] - empty for entries without post IDs (older plugin versions).
+	 */
+	private function get_item_post_ids( $item ) {
+
+		if ( ! isset( $item['post_ids'] ) || ! is_array( $item['post_ids'] ) ) {
+			return array();
+		}
+
+		$post_ids = array_filter(
+			array_map( 'intval', $item['post_ids'] ),
+			function ( $post_id ) {
+				return $post_id > 0;
+			}
+		);
+
+		return array_values( array_unique( $post_ids ) );
 	}
 
 	/**
@@ -86,16 +228,23 @@ class Surfer_Image_Processor {
 				return;
 			}
 
-			$results = array();
+			$results   = array();
+			$processed = array();
 
 			foreach ( $batch as $item ) {
-				$results[ $item['url'] ] = $this->download_and_replace_image(
+				$post_ids = $this->get_item_post_ids( $item );
+
+				$this->count_attempt( $item['url'] );
+
+				$results[ $item['url'] ]   = $this->download_and_replace_image(
 					$item['url'],
-					isset( $item['alt'] ) ? $item['alt'] : ''
+					isset( $item['alt'] ) ? $item['alt'] : '',
+					$post_ids
 				);
+				$processed[ $item['url'] ] = $post_ids;
 			}
 
-			$queue = $this->release_batch( $results );
+			$queue = $this->release_batch( $results, $processed );
 
 			if ( ! empty( $queue ) ) {
 				$this->schedule_next_run( 1 );
@@ -121,6 +270,36 @@ class Surfer_Image_Processor {
 	}
 
 	/**
+	 * How many images to download in the current run.
+	 *
+	 * @return int
+	 */
+	private function get_batch_size() {
+
+		/**
+		 * Filters how many images are downloaded in one background run.
+		 *
+		 * Values below 1 are ignored and the default batch size is used. Values are capped,
+		 * so a run fits in the run lock and image leases (`LEASE_TIME`, 300 seconds): at most
+		 * `floor( 300 / ( download_timeout + 30 ) )` images, where `download_timeout` comes
+		 * from the `surfer_import_limits` filter and 30 seconds are left for saving the file
+		 * and generating its sizes - 5 images with the default 30 seconds timeout.
+		 *
+		 * @param int $batch_size - number of images per run.
+		 */
+		$batch_size = (int) apply_filters( 'surfer_image_batch_size', self::BATCH_SIZE );
+
+		if ( $batch_size < 1 ) {
+			$batch_size = self::BATCH_SIZE;
+		}
+
+		$download_timeout = surfer_get_import_limits()['download_timeout'];
+		$max_batch_size   = max( 1, (int) floor( self::LEASE_TIME / ( $download_timeout + 30 ) ) );
+
+		return min( $batch_size, $max_batch_size );
+	}
+
+	/**
 	 * Takes a batch of images from the queue and marks them as being processed.
 	 *
 	 * Downloads happen outside of the lock (they can take seconds), so images are leased
@@ -143,15 +322,26 @@ class Surfer_Image_Processor {
 			return array();
 		}
 
-		$batch = array();
-		$now   = time();
+		$batch      = array();
+		$given_up   = array();
+		$dropped    = array();
+		$now        = time();
+		$batch_size = $this->get_batch_size();
 
 		foreach ( $queue as $key => $item ) {
-			if ( count( $batch ) >= self::BATCH_SIZE ) {
+			if ( count( $batch ) >= $batch_size ) {
 				break;
 			}
 
 			if ( empty( $item['url'] ) ) {
+				unset( $queue[ $key ] );
+				continue;
+			}
+
+			// Entries queued by older plugin versions do not say which posts use the image,
+			// and changing every post with that URL could touch posts of other authors.
+			if ( empty( $this->get_item_post_ids( $item ) ) ) {
+				$dropped[] = $item['url'];
 				unset( $queue[ $key ] );
 				continue;
 			}
@@ -162,6 +352,17 @@ class Surfer_Image_Processor {
 				continue;
 			}
 
+			// Workers died on this image every time (PHP timeout, out of memory) - they never
+			// reached `release_batch()`, so without this check the image would be retried
+			// after every lease forever.
+			$attempts = isset( $item['attempts'] ) ? (int) $item['attempts'] : 0;
+
+			if ( $attempts >= self::MAX_ATTEMPTS ) {
+				$given_up[] = $item;
+				unset( $queue[ $key ] );
+				continue;
+			}
+
 			$queue[ $key ]['processing_at'] = $now;
 			$batch[]                        = $queue[ $key ];
 		}
@@ -169,22 +370,74 @@ class Surfer_Image_Processor {
 		update_option( 'surfer_image_download_queue', array_values( $queue ), false );
 		surfer_release_lock( 'image_queue' );
 
+		foreach ( $dropped as $image_url ) {
+			surfer_log_image_import_error( $image_url, 'queue entry without post IDs dropped, no post was changed' );
+		}
+
+		foreach ( $given_up as $item ) {
+			$this->give_up_on_image( $item['url'], $this->get_item_post_ids( $item ) );
+		}
+
 		return $batch;
 	}
 
 	/**
-	 * Removes downloaded images from the queue and counts attempts for the failed ones.
+	 * Counts an attempt to import the image, before the import starts.
 	 *
-	 * @param array $results - map of image URL => was it processed successfully.
+	 * A worker killed during the import (big image, slow server) never gets to
+	 * `release_batch()`, so counting there would let such an image be retried forever.
+	 *
+	 * @param string $image_url - URL of the image.
+	 * @return void
+	 */
+	private function count_attempt( $image_url ) {
+
+		// Writing without the lock could drop entries queued in the meantime. The attempt
+		// is not counted then - the image is still leased, so it is not retried right away.
+		if ( ! surfer_acquire_lock( 'image_queue' ) ) {
+			return;
+		}
+
+		$queue = get_option( 'surfer_image_download_queue', array() );
+
+		foreach ( (array) $queue as $key => $item ) {
+			if ( isset( $item['url'] ) && $item['url'] === $image_url ) {
+				$queue[ $key ]['attempts'] = isset( $item['attempts'] ) ? (int) $item['attempts'] + 1 : 1;
+			}
+		}
+
+		update_option( 'surfer_image_download_queue', $queue, false );
+		surfer_release_lock( 'image_queue' );
+	}
+
+	/**
+	 * Removes downloaded images from the queue, and the failed ones out of attempts.
+	 *
+	 * Posts imported while the image was being downloaded were added to its entry after
+	 * the batch was leased - the entry stays for them, and the next run only points them
+	 * to the attachment that already exists.
+	 *
+	 * A file that is not an image or is too large will not change on the next attempt,
+	 * so it is not retried: a non-image is dropped and posts keep its URL, a too large
+	 * image is replaced with the placeholder right away.
+	 *
+	 * @param array $results - map of image URL => result: `ok`, `not_image`, `too_large` or `error`.
+	 * @param array $processed - map of image URL => IDs of posts handled in this run.
 	 * @return array - queue left to process.
 	 */
-	private function release_batch( $results ) {
+	private function release_batch( $results, $processed ) {
 
-		$lock_acquired = surfer_acquire_lock( 'image_queue' );
+		// Writing without the lock could drop entries queued in the meantime. The queue is
+		// left as it is instead - leases expire, and the next run finds the attachments
+		// that already exist instead of downloading the images again.
+		if ( ! surfer_acquire_lock( 'image_queue' ) ) {
+			return (array) get_option( 'surfer_image_download_queue', array() );
+		}
 
-		$queue       = get_option( 'surfer_image_download_queue', array() );
-		$new_queue   = array();
-		$failed_urls = array();
+		$queue     = get_option( 'surfer_image_download_queue', array() );
+		$new_queue = array();
+		$failed    = array();
+		$too_large = array();
 
 		foreach ( (array) $queue as $item ) {
 			if ( empty( $item['url'] ) ) {
@@ -196,33 +449,86 @@ class Surfer_Image_Processor {
 				continue;
 			}
 
-			if ( $results[ $item['url'] ] ) {
+			unset( $item['processing_at'] );
+
+			if ( 'not_image' === $results[ $item['url'] ] ) {
 				continue;
 			}
 
-			$item['attempts'] = isset( $item['attempts'] ) ? (int) $item['attempts'] + 1 : 1;
-			unset( $item['processing_at'] );
+			if ( 'too_large' === $results[ $item['url'] ] ) {
+				$too_large[] = $item;
+				continue;
+			}
+
+			if ( 'ok' === $results[ $item['url'] ] ) {
+				$handled_post_ids = isset( $processed[ $item['url'] ] ) ? $processed[ $item['url'] ] : array();
+				$new_post_ids     = array_values( array_diff( $this->get_item_post_ids( $item ), $handled_post_ids ) );
+
+				if ( ! empty( $new_post_ids ) ) {
+					$item['post_ids'] = $new_post_ids;
+					$item['attempts'] = 0;
+					$new_queue[]      = $item;
+				}
+
+				continue;
+			}
 
 			// Give up eventually, so one broken URL does not keep the queue alive forever.
-			if ( $item['attempts'] < self::MAX_ATTEMPTS ) {
+			// No `attempts` means none was counted (the lock was busy in `count_attempt()`),
+			// not that the attempts are used up.
+			if ( (int) ( isset( $item['attempts'] ) ? $item['attempts'] : 0 ) < self::MAX_ATTEMPTS ) {
 				$new_queue[] = $item;
 				continue;
 			}
 
-			$failed_urls[] = $item['url'];
+			$failed[] = $item;
 		}
 
 		update_option( 'surfer_image_download_queue', $new_queue, false );
+		surfer_release_lock( 'image_queue' );
 
-		if ( $lock_acquired ) {
-			surfer_release_lock( 'image_queue' );
+		foreach ( $failed as $item ) {
+			$this->mark_image_as_failed( $item['url'], $this->get_item_post_ids( $item ) );
 		}
 
-		foreach ( $failed_urls as $failed_url ) {
-			$this->mark_image_as_failed( $failed_url );
+		foreach ( $too_large as $item ) {
+			$this->mark_image_as_failed( $item['url'], $this->get_item_post_ids( $item ), 'image is too large, replaced with a placeholder' );
 		}
 
 		return $new_queue;
+	}
+
+	/**
+	 * Stops processing an image that killed the worker too many times.
+	 *
+	 * The attachment may already be in the media library (the worker died after creating
+	 * it, e.g. while generating image sizes) - then posts are pointed to it, and only
+	 * otherwise the image is replaced with the placeholder. Nothing is downloaded here,
+	 * so this cannot kill the worker again.
+	 *
+	 * @param string $image_url - URL of the image.
+	 * @param int[]  $post_ids - IDs of posts the image was queued for.
+	 * @return void
+	 */
+	private function give_up_on_image( $image_url, $post_ids ) {
+
+		$attachment_id = surfer_find_attachment_by_original_url( $image_url );
+		$new_url       = $attachment_id ? wp_get_attachment_url( $attachment_id ) : false;
+
+		if ( ! $new_url ) {
+			$this->mark_image_as_failed( $image_url, $post_ids );
+			return;
+		}
+
+		foreach ( $this->find_target_posts( $image_url, $post_ids ) as $post_id ) {
+			$this->replace_image_in_post_content( $post_id, $image_url, $new_url, $attachment_id );
+			$this->replace_image_in_elementor_data( $post_id, $image_url, $new_url, $attachment_id );
+		}
+
+		surfer_log_image_import_error(
+			$image_url,
+			'import did not finish after ' . self::MAX_ATTEMPTS . ' attempts, posts point to attachment ' . $attachment_id
+		);
 	}
 
 	/**
@@ -231,21 +537,23 @@ class Surfer_Image_Processor {
 	 * Leaving the Surfer URL in the content would hide the problem - the post looks fine,
 	 * the media library is empty, and the image disappears once Surfer removes the file.
 	 *
-	 * @param string $image_url - URL of the image that could not be imported.
+	 * @param string      $image_url - URL of the image that could not be imported.
+	 * @param int[]       $post_ids - IDs of posts the image was queued for.
+	 * @param string|null $reason - message to log, null for the attempts limit.
 	 * @return void
 	 */
-	private function mark_image_as_failed( $image_url ) {
+	private function mark_image_as_failed( $image_url, $post_ids, $reason = null ) {
 
 		$failed_image_url = surfer_get_failed_image_url();
 
-		foreach ( $this->find_posts_with_image( $image_url ) as $post_id ) {
+		foreach ( $this->find_target_posts( $image_url, $post_ids ) as $post_id ) {
 			$this->replace_image_in_post_content( $post_id, $image_url, $failed_image_url, 0 );
 			$this->replace_image_in_elementor_data( $post_id, $image_url, $failed_image_url, 0 );
 		}
 
 		surfer_log_image_import_error(
 			$image_url,
-			'gave up after ' . self::MAX_ATTEMPTS . ' attempts, image replaced with a placeholder'
+			null !== $reason ? $reason : 'gave up after ' . self::MAX_ATTEMPTS . ' attempts, image replaced with a placeholder'
 		);
 	}
 
@@ -254,79 +562,129 @@ class Surfer_Image_Processor {
 	 *
 	 * @param string $image_url - URL of the image.
 	 * @param string $image_alt - Alt text for the image.
-	 * @return bool - true when the image is in the media library and posts are updated.
+	 * @param int[]  $post_ids - IDs of posts the image was queued for.
+	 * @return string - `ok` when the image is in the media library and posts are updated,
+	 *                  or when no post uses the image anymore; otherwise `not_image`,
+	 *                  `too_large` or `error` - see surfer_download_image().
 	 */
-	private function download_and_replace_image( $image_url, $image_alt ) {
+	private function download_and_replace_image( $image_url, $image_alt, $post_ids ) {
+
+		$target_post_ids = $this->find_target_posts( $image_url, $post_ids );
+
+		// The image was removed from the posts (or the posts were deleted) before the
+		// queue got to it - there is nothing to download it for.
+		if ( empty( $target_post_ids ) ) {
+			return 'ok';
+		}
 
 		// The image may have been imported in the meantime (duplicated queue entry,
 		// another post using the same image) - do not download it twice.
 		$attachment_id = surfer_find_attachment_by_original_url( $image_url );
 
 		if ( ! $attachment_id ) {
-			$attachment_id = $this->download_image_to_media_library( $image_url, $image_alt );
+			$result = $this->download_image_to_media_library( $image_url, $image_alt );
+
+			if ( 'ok' !== $result['status'] || empty( $result['attachment_id'] ) ) {
+				return 'ok' === $result['status'] ? 'error' : $result['status'];
+			}
+
+			$attachment_id = $result['attachment_id'];
 		} else {
 			surfer_update_image_alt( $attachment_id, $image_alt );
-		}
-
-		if ( ! $attachment_id ) {
-			return false;
 		}
 
 		$new_url = wp_get_attachment_url( $attachment_id );
 
 		if ( ! $new_url ) {
-			return false;
+			return 'error';
 		}
 
-		foreach ( $this->find_posts_with_image( $image_url ) as $post_id ) {
+		foreach ( $target_post_ids as $post_id ) {
 			$this->replace_image_in_post_content( $post_id, $image_url, $new_url, $attachment_id );
 			$this->replace_image_in_elementor_data( $post_id, $image_url, $new_url, $attachment_id );
 		}
 
-		return true;
+		return 'ok';
 	}
 
 	/**
-	 * Finds posts that still use the Surfer URL, both in content and in Elementor data.
+	 * Picks the posts the image was queued for that still use it.
+	 *
+	 * Only `src` of `<img>` tags in the content and image widgets in Elementor data count -
+	 * the same URL in a link or in the text is not an image to import.
 	 *
 	 * @param string $image_url - URL of the image.
-	 * @return array - list of post IDs.
+	 * @param int[]  $post_ids - IDs of posts the image was queued for.
+	 * @return int[] - IDs of posts to update.
 	 */
-	private function find_posts_with_image( $image_url ) {
-		global $wpdb;
+	private function find_target_posts( $image_url, $post_ids ) {
 
-		// Every status the importer can set, otherwise scheduled and private posts would
-		// keep hotlinked images forever.
-		$statuses     = array( 'publish', 'draft', 'pending', 'future', 'private' );
-		$placeholders = implode( ', ', array_fill( 0, count( $statuses ), '%s' ) );
+		$target_post_ids = array();
 
-		$like = '%' . $wpdb->esc_like( $image_url ) . '%';
+		foreach ( $post_ids as $post_id ) {
+			$post = get_post( $post_id );
 
-		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-		$post_ids = $wpdb->get_col(
-			$wpdb->prepare(
-				"SELECT ID FROM {$wpdb->posts}
-				 WHERE post_content LIKE %s
-				 AND post_status IN ( {$placeholders} )",
-				array_merge( array( $like ), $statuses )
-			)
-		);
+			if ( ! $post instanceof \WP_Post || 'trash' === $post->post_status ) {
+				continue;
+			}
 
-		// Elementor keeps its own copy of the content, and it may be the only place with
-		// the image when the post was edited in Elementor after the import.
-		$elementor_post_ids = $wpdb->get_col(
-			$wpdb->prepare(
-				"SELECT p.ID FROM {$wpdb->posts} p
-				 INNER JOIN {$wpdb->postmeta} m ON m.post_id = p.ID
-				 WHERE m.meta_key = '_elementor_data'
-				 AND m.meta_value LIKE %s
-				 AND p.post_status IN ( {$placeholders} )",
-				array_merge( array( $like ), $statuses )
-			)
-		);
-		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			if ( surfer_content_has_img_src( (string) $post->post_content, $image_url ) ) {
+				$target_post_ids[] = (int) $post->ID;
+				continue;
+			}
 
-		return array_unique( array_map( 'intval', array_merge( (array) $post_ids, (array) $elementor_post_ids ) ) );
+			$elements = $this->get_elementor_elements( (int) $post->ID );
+
+			if ( is_array( $elements ) && $this->elementor_data_has_image( $elements, $image_url ) ) {
+				$target_post_ids[] = (int) $post->ID;
+			}
+		}
+
+		return $target_post_ids;
+	}
+
+	/**
+	 * Returns decoded Elementor data of the post.
+	 *
+	 * Elementor stores JSON with escaped slashes (`https:\/\/`), so the URL can be compared
+	 * only after decoding.
+	 *
+	 * @param int $post_id - ID of the post.
+	 * @return array|null - null when the post has no Elementor data or it cannot be decoded.
+	 */
+	private function get_elementor_elements( $post_id ) {
+
+		$elementor_data = get_post_meta( $post_id, '_elementor_data', true );
+
+		if ( ! is_string( $elementor_data ) || '' === $elementor_data ) {
+			return null;
+		}
+
+		$elements = json_decode( $elementor_data, true );
+
+		return is_array( $elements ) ? $elements : null;
+	}
+
+	/**
+	 * Checks if any Elementor image widget uses the image.
+	 *
+	 * @param array  $elements - Elementor elements.
+	 * @param string $image_url - URL of the image.
+	 * @return bool
+	 */
+	private function elementor_data_has_image( $elements, $image_url ) {
+
+		foreach ( $elements as $element ) {
+			if ( isset( $element['settings']['image']['url'] ) && $element['settings']['image']['url'] === $image_url ) {
+				return true;
+			}
+
+			if ( ! empty( $element['elements'] ) && is_array( $element['elements'] ) && $this->elementor_data_has_image( $element['elements'], $image_url ) ) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	/**
@@ -342,22 +700,45 @@ class Surfer_Image_Processor {
 
 		$content = get_post_field( 'post_content', $post_id, 'raw' );
 
-		if ( ! is_string( $content ) || false === strpos( $content, $image_url ) ) {
+		if ( ! is_string( $content ) ) {
 			return;
 		}
 
-		$content = str_replace( $image_url, $new_url, $content );
+		$updated_content = surfer_replace_img_src( $content, $image_url, $new_url );
 
-		if ( $attachment_id > 0 ) {
-			$content = $this->link_gutenberg_image_blocks( $content, $new_url, $attachment_id );
+		if ( $updated_content === $content ) {
+			return;
 		}
 
-		wp_update_post(
-			array(
-				'ID'           => $post_id,
-				'post_content' => wp_slash( $content ),
-			)
-		);
+		$content = $updated_content;
+
+		if ( $attachment_id > 0 ) {
+			// `src` holds the URL escaped the same way.
+			$content = $this->link_gutenberg_image_blocks( $content, esc_url( $new_url ), $attachment_id );
+		}
+
+		// The worker runs in WP-Cron without a logged-in user, so kses would strip markup the
+		// author is allowed to use (Custom HTML block with an iframe or a script). The content
+		// comes from the database and only `src` changed (escaped with `esc_url()`), so it is
+		// saved without kses.
+		$had_kses = false !== has_filter( 'content_save_pre', 'wp_filter_post_kses' );
+
+		if ( $had_kses ) {
+			kses_remove_filters();
+		}
+
+		try {
+			wp_update_post(
+				array(
+					'ID'           => $post_id,
+					'post_content' => wp_slash( $content ),
+				)
+			);
+		} finally {
+			if ( $had_kses ) {
+				kses_init_filters();
+			}
+		}
 	}
 
 	/**
@@ -470,13 +851,13 @@ class Surfer_Image_Processor {
 
 		$elementor_data = get_post_meta( $post_id, '_elementor_data', true );
 
-		if ( ! is_string( $elementor_data ) || false === strpos( $elementor_data, $image_url ) ) {
+		if ( ! is_string( $elementor_data ) || '' === $elementor_data ) {
 			return;
 		}
 
-		$elements = json_decode( $elementor_data, true );
+		$elements = $this->get_elementor_elements( $post_id );
 
-		if ( ! is_array( $elements ) ) {
+		if ( null === $elements ) {
 			surfer_log_image_import_error( $image_url, 'could not decode _elementor_data of post ' . $post_id );
 			return;
 		}
@@ -539,52 +920,9 @@ class Surfer_Image_Processor {
 	 *
 	 * @param string $image_url - URL of the image.
 	 * @param string $image_alt - Alt text for the image.
-	 * @return int|false Attachment ID or false on failure.
+	 * @return array{status: string, attachment_id?: int} - see surfer_download_image().
 	 */
 	private function download_image_to_media_library( $image_url, $image_alt ) {
-		require_once ABSPATH . 'wp-admin/includes/media.php';
-		require_once ABSPATH . 'wp-admin/includes/file.php';
-		require_once ABSPATH . 'wp-admin/includes/image.php';
-
-		if ( empty( $image_url ) || ! wp_http_validate_url( $image_url ) ) {
-			surfer_log_image_import_error( $image_url, 'invalid image URL' );
-			return false;
-		}
-
-		$tmp_file = download_url( $image_url );
-
-		if ( is_wp_error( $tmp_file ) ) {
-			surfer_log_image_import_error( $image_url, $tmp_file->get_error_message() );
-			return false;
-		}
-
-		$file_name = surfer_resolve_image_file_name( $image_url, $tmp_file );
-
-		// Mime type is intentionally not provided - WordPress detects it from the
-		// downloaded file, so images from URLs without an extension are not rejected.
-		$attachment_id = media_handle_sideload(
-			array(
-				'tmp_name' => $tmp_file,
-				'name'     => $file_name,
-			),
-			0
-		);
-
-		if ( file_exists( $tmp_file ) ) {
-			@unlink( $tmp_file ); // phpcs:ignore
-		}
-
-		if ( is_wp_error( $attachment_id ) || empty( $attachment_id ) ) {
-			$error_message = is_wp_error( $attachment_id ) ? $attachment_id->get_error_message() : 'attachment was not created';
-			surfer_log_image_import_error( $image_url, $error_message );
-			return false;
-		}
-
-		update_post_meta( $attachment_id, 'surfer_file_name', $file_name );
-		update_post_meta( $attachment_id, 'surfer_file_original_url', $image_url );
-		surfer_forget_attachment_by_original_url( $image_url );
-		surfer_update_image_alt( $attachment_id, $image_alt );
-
-		return $attachment_id;
+		return surfer_download_image( (string) $image_url, (string) $image_alt );
 	}
 }

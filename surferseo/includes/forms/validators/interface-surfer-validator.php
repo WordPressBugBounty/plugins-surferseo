@@ -27,7 +27,7 @@ interface Surfer_Validator_Interface {
 	/**
 	 * Returns error message in case of validation fail.
 	 *
-	 * @return string.
+	 * @return string
 	 */
 	public function get_error();
 }

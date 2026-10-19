@@ -417,12 +417,19 @@ class Surfer_Admin {
 	private function get_debug_data() {
 		$interval = intval( Surferseo::get_instance()->get_surfer_settings()->get_option( 'content-importer', 'surfer_gsc_data_collection_interval', 7 ) );
 
+		// The file is sent to support, so it never carries the full API key.
+		$api_key_mask = surfer_mask_secret( get_option( 'wpsurfer_api_access_key', false ) );
+		$api_key_info = '' === $api_key_mask ? 'not set' : 'set (' . $api_key_mask . ')';
+
+		$connection_details = get_option( 'surfer_connection_details', false );
+		$connection_info    = ( is_array( $connection_details ) && ! empty( $connection_details ) ) ? join( PHP_EOL, $connection_details ) : 'not connected';
+
 		$content  = gmdate( 'd-m-Y H:i:s' ) . PHP_EOL . PHP_EOL;
 		$content .= 'HOME URL: ' . home_url() . PHP_EOL . PHP_EOL;
 		$content .= 'SITE URL: ' . get_site_url() . PHP_EOL . PHP_EOL;
 		$content .= 'AFTER FILTER SITE URL: ' . apply_filters( 'surfer_api_base_url', get_site_url() ) . PHP_EOL . PHP_EOL;
-		$content .= 'SURFER API KEY: ' . get_option( 'wpsurfer_api_access_key', false ) . PHP_EOL . PHP_EOL;
-		$content .= 'SURFER ORGANIZATION: ' . join( PHP_EOL, get_option( 'surfer_connection_details', null ) ) . PHP_EOL . PHP_EOL;
+		$content .= 'SURFER API KEY: ' . $api_key_info . PHP_EOL . PHP_EOL;
+		$content .= 'SURFER ORGANIZATION: ' . $connection_info . PHP_EOL . PHP_EOL;
 		$content .= 'PERMALINK STRUCTURE: ' . get_option( 'permalink_structure', false ) . PHP_EOL . PHP_EOL;
 		$content .= 'GSC DATA INTERVAL: ' . $interval . PHP_EOL . PHP_EOL;
 		$content .= 'LAST GSC DATA GATHERING: ' . get_option( 'surfer_last_gsc_data_update', false ) . PHP_EOL . PHP_EOL;

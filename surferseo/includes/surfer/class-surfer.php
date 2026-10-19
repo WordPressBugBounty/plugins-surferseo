@@ -28,6 +28,18 @@ class Surfer {
 	private const API_PATH = '/api/v1/wordpress';
 
 	/**
+	 * Path to the writing guidelines script, relative to the Surfer URL.
+	 *
+	 * Floating alias that Surfer keeps on the latest 1.x release, so script fixes ship without a plugin release.
+	 */
+	private const GUIDELINES_SCRIPT_PATH = '/static/surfer_guidelines_1_x_x.js';
+
+	/**
+	 * Default URL to Surfer, used when no trusted URL is configured.
+	 */
+	private const DEFAULT_SURFER_URL = 'https://app.surferseo.com';
+
+	/**
 	 * URL to Surfer.
 	 *
 	 * @var string
@@ -119,18 +131,37 @@ class Surfer {
 
 		add_action( 'wp_ajax_check_connection_status', array( $this, 'check_connection_status' ) );
 
+		add_action( 'wp_ajax_surfer_guidelines_script', array( $this, 'redirect_to_guidelines_script' ) );
+
 		add_action( 'surfer_gather_available_locations', array( $this, 'surfer_gather_available_locations' ) );
 
 		$this->run_cron_tasks();
 	}
 
 	/**
-	 * Gets API URL from config or use default one.
+	 * Gets Surfer URL from config or uses the default one, and derives API URL from it.
+	 *
+	 * The Surfer URL from settings is used only when it passes `surfer_is_trusted_surfer_url()`
+	 * (`https` and a host from the `surfer_trusted_hosts` filter or its subdomain). This URL
+	 * receives the API key and the connection token and serves the writing guidelines script,
+	 * so any other value falls back to the default URL.
 	 *
 	 * @return void
 	 */
 	public function resolve_api_url() {
-		$this->surfer_url = rtrim( Surferseo::get_instance()->get_surfer_settings()->get_option( 'content-importer', 'surfer_url', 'https://app.surferseo.com' ), '/' );
+		$surfer_url = Surferseo::get_instance()->get_surfer_settings()->get_option( 'content-importer', 'surfer_url', self::DEFAULT_SURFER_URL );
+		$surfer_url = is_string( $surfer_url ) ? rtrim( $surfer_url, '/' ) : '';
+
+		if ( ! surfer_is_trusted_surfer_url( $surfer_url ) ) {
+			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+				// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Logged only in debug mode.
+				error_log( sprintf( 'Surfer: Surfer URL "%s" is not a trusted Surfer URL, using %s instead.', $surfer_url, self::DEFAULT_SURFER_URL ) );
+			}
+
+			$surfer_url = self::DEFAULT_SURFER_URL;
+		}
+
+		$this->surfer_url = $surfer_url;
 
 		/**
 		 * Filters URL of the Surfer WordPress API.
@@ -138,8 +169,11 @@ class Surfer {
 		 * The API always lives under the same host as Surfer itself, so it is derived
 		 * from the Surfer URL instead of being configured separately.
 		 *
+		 * Unlike the Surfer URL from settings, the returned value is not checked against
+		 * trusted hosts: this filter is a code-level override, trusted like any other code.
+		 *
 		 * @param string $api_url - URL of the Surfer WordPress API.
-		 * @param string $surfer_url - URL of Surfer.
+		 * @param string $surfer_url - URL of Surfer (already checked against trusted hosts).
 		 */
 		$this->surfer_api_url = apply_filters(
 			'surfer_api_url',
@@ -164,6 +198,51 @@ class Surfer {
 	 */
 	public function get_surfer_url() {
 		return $this->surfer_url;
+	}
+
+	/**
+	 * Returns URL that should be used to load the writing guidelines script.
+	 *
+	 * Since WordPress 7.1 the block editor runs inside an output buffer that adds
+	 * `crossorigin="anonymous"` to every asset served from another host, see
+	 * `wp_add_crossorigin_attributes()` hooked through `wp_set_up_cross_origin_isolation()`.
+	 * That turns the request into a CORS request, which Surfer's static host does not answer,
+	 * so the script fails to load in Gutenberg (the Classic Editor is not affected, because the
+	 * buffer only starts on block editor screens). The attribute is added in an output buffer,
+	 * after `script_loader_tag`, so it cannot be filtered out.
+	 *
+	 * WordPress leaves same-origin URLs alone, so we point the script at an endpoint of our own
+	 * that redirects to Surfer. A script tag without `crossorigin` follows the cross-origin
+	 * redirect as a regular, non-CORS request.
+	 *
+	 * Can be dropped once https://core.trac.wordpress.org/ticket/65930 ships.
+	 *
+	 * @return string
+	 */
+	public function get_guidelines_script_url() {
+
+		if ( ! function_exists( 'wp_add_crossorigin_attributes' ) ) {
+			return $this->get_surfer_url() . self::GUIDELINES_SCRIPT_PATH;
+		}
+
+		return add_query_arg( 'action', 'surfer_guidelines_script', admin_url( 'admin-ajax.php' ) );
+	}
+
+	/**
+	 * Redirects to the writing guidelines script hosted by Surfer.
+	 *
+	 * @return void
+	 */
+	public function redirect_to_guidelines_script() {
+
+		// admin-ajax.php sends no-cache headers, but this redirect is safe to cache: the target
+		// is a fixed alias whose content Surfer updates within 1.x, so the redirect itself never changes.
+		header_remove( 'Expires' );
+		header( 'Cache-Control: public, max-age=' . DAY_IN_SECONDS );
+
+		// phpcs:ignore WordPress.Security.SafeRedirect.wp_redirect_wp_redirect -- Redirect to Surfer's static host is the whole point of this endpoint.
+		wp_redirect( $this->get_surfer_url() . self::GUIDELINES_SCRIPT_PATH, 302 );
+		exit;
 	}
 
 	/**
@@ -340,18 +419,33 @@ class Surfer {
 	/**
 	 * Checks permission of user that is trying to use API.
 	 *
-	 * @param WP_API_Request $request - Request object.
+	 * @param \WP_REST_Request $request - Request object.
 	 * @return bool
 	 */
 	public function verify_request_permission( $request ) {
 		$received_token = $this->get_bearer_token();
 		$saved_token    = get_option( 'wpsurfer_api_access_key', false );
 
-		if ( null !== $received_token && false !== $saved_token && $received_token === $saved_token ) {
-			return true;
+		return $this->tokens_match( $saved_token, $received_token );
+	}
+
+	/**
+	 * Compares saved token with received one in constant time.
+	 *
+	 * @param mixed $saved_token - token stored in WordPress.
+	 * @param mixed $received_token - token received in the request.
+	 * @return bool - true only when both tokens are non-empty strings and are equal.
+	 */
+	private function tokens_match( $saved_token, $received_token ) {
+		if ( ! is_string( $saved_token ) || '' === $saved_token ) {
+			return false;
 		}
 
-		return false;
+		if ( ! is_string( $received_token ) || '' === $received_token ) {
+			return false;
+		}
+
+		return hash_equals( $saved_token, $received_token );
 	}
 
 	/**
@@ -402,7 +496,7 @@ class Surfer {
 	/**
 	 * Function to verify response from Surfer.
 	 *
-	 * @param WP_REST_Request $request - Request object.
+	 * @param \WP_REST_Request $request - Request object.
 	 * @return string
 	 */
 	public function surfer_connect_verify( $request ) {
@@ -416,9 +510,10 @@ class Surfer {
 			$token_saved = update_option( 'wpsurfer_api_access_key', $api_key, false );
 			delete_option( 'surfer_connection_token' );
 
+			// Both values are shown in wp-admin, so only plain text may be stored.
 			$connection_details = array(
-				'organization_name' => $request['organization_name'],
-				'via_email'         => $request['via_email'],
+				'organization_name' => isset( $request['organization_name'] ) ? sanitize_text_field( wp_unslash( $request['organization_name'] ) ) : '',
+				'via_email'         => isset( $request['via_email'] ) ? sanitize_email( wp_unslash( $request['via_email'] ) ) : '',
 			);
 
 			update_option( 'surfer_connection_details', $connection_details, false );
@@ -448,11 +543,7 @@ class Surfer {
 	private function verify_connection_token( $token ) {
 		$wp_token = get_option( 'surfer_connection_token' );
 
-		if ( false !== $wp_token && $wp_token === $token ) {
-			return true;
-		}
-
-		return false;
+		return $this->tokens_match( $wp_token, $token );
 	}
 
 	/**
@@ -530,7 +621,7 @@ class Surfer {
 	/**
 	 * Creates parsed post based on content from Surfer.
 	 *
-	 * @param WP_REST_Request $request - request object.
+	 * @param \WP_REST_Request $request - request object.
 	 * @return WP_REST_Response
 	 */
 	public function surfer_import_post( $request ) {
@@ -543,6 +634,19 @@ class Surfer {
 					'error' => __( 'Cannot add post with empty content.', 'surferseo' ),
 				),
 				422
+			);
+		}
+
+		// Checked before the import raises memory and time limits for itself.
+		$content_limit = surfer_get_import_limits()['content_bytes'];
+
+		if ( is_string( $content ) && strlen( $content ) > $content_limit ) {
+			return new WP_REST_Response(
+				array(
+					'error'       => __( 'Content is too large to import.', 'surferseo' ),
+					'limit_bytes' => $content_limit,
+				),
+				413
 			);
 		}
 
@@ -639,7 +743,7 @@ class Surfer {
 	/**
 	 * Returns list of all posts. Version for WPSurfer >=1.2.0
 	 *
-	 * @param WP_REST_Request $request - request object.
+	 * @param \WP_REST_Request $request - request object.
 	 * @return array
 	 */
 	public function surfer_return_posts_list( $request ) {
@@ -844,6 +948,11 @@ class Surfer {
 			}
 		}
 
+		// No SEO plugin active: the importer keeps meta in Surfer's own keys.
+		if ( 'surfer' === surfer_detect_active_seo_plugin() ) {
+			return get_post_meta( $post_id, '_surferseo_title', true );
+		}
+
 		if ( surfer_check_if_plugins_is_active( 'wordpress-seo/wp-seo.php' ) ) {
 			$title = get_post_meta( $post_id, '_yoast_wpseo_title', true );
 			if ( ! empty( $title ) ) {
@@ -889,6 +998,11 @@ class Surfer {
 				case 'surfer':
 					return get_post_meta( $post_id, '_surferseo_description', true );
 			}
+		}
+
+		// No SEO plugin active: the importer keeps meta in Surfer's own keys.
+		if ( 'surfer' === surfer_detect_active_seo_plugin() ) {
+			return get_post_meta( $post_id, '_surferseo_description', true );
 		}
 
 		if ( surfer_check_if_plugins_is_active( 'wordpress-seo/wp-seo.php' ) ) {
@@ -942,7 +1056,7 @@ class Surfer {
 	/**
 	 * Returns list of post details options.
 	 *
-	 * @param WP_REST_Request $request - request object.
+	 * @param \WP_REST_Request $request - request object.
 	 * @return array
 	 */
 	public function list_post_details_options( $request ) {
@@ -1303,7 +1417,7 @@ class Surfer {
 	/**
 	 * Returns list of supported post types.
 	 *
-	 * @param WP_REST_Request $request - request object.
+	 * @param \WP_REST_Request $request - request object.
 	 * @return array
 	 */
 	public function surfer_return_post_types( $request ) {
@@ -1517,7 +1631,7 @@ class Surfer {
 		$surfer_url = Surfer()->get_surfer()->get_surfer_url();
 
 		wp_register_script( 'surfer-guidelines-debug', $base_url . '/assets/js/surfer-guidelines-debug.js', array(), SURFER_VERSION, false );
-		wp_register_script( 'surfer-guidelines', $surfer_url . '/static/surfer_guidelines_1_3_1.js', array( 'surfer-guidelines-debug' ), SURFER_VERSION, false );
+		wp_register_script( 'surfer-guidelines', $this->get_guidelines_script_url(), array( 'surfer-guidelines-debug' ), SURFER_VERSION, false );
 
 		$react_deps = array(
 			'wp-plugins',
@@ -1570,20 +1684,14 @@ class Surfer {
 				// Surfer general usage.
 				'wp_language'            => strtolower( $this->get_language_code() ),
 				'learnmore_url'          => 'https://docs.surferseo.com/en/collections/3548643-wpsurfer',
-				'config_url'             => admin_url( 'admin.php?page=surfer#header_core' ),
-				'apiurl'                 => Surfer()->get_surfer()->get_api_url(),
 				'surferurl'              => $surfer_url,
-				'locations'              => Surfer()->get_surfer()->surfer_hardcoded_location(),
 				'organization_name'      => ( isset( $connection_details ) && isset( $connection_details['organization_name'] ) ) ? $connection_details['organization_name'] : '',
-				// Surfer connection details.
-				'api_key'                => get_option( 'wpsurfer_api_access_key', null ),
-				'connected'              => Surfer()->get_surfer()->is_surfer_connected(),
+				// Notifications.
 				'emails_enabled'         => Surfer()->get_surfer()->get_gsc()->performance_report_email_notification_enabled(),
 				// Surfer post details.
 				'default_draft_id'       => get_post_meta( get_the_ID(), 'surfer_draft_id', true ),
 				'default_permalink_hash' => get_post_meta( get_the_ID(), 'surfer_permalink_hash', true ),
 				'post_is_scraped'        => get_post_meta( get_the_ID(), 'surfer_scrape_ready', true ),
-				'last_post_update'       => get_post_meta( get_the_ID(), 'surfer_last_post_update', true ),
 				'default_post_keywords'  => get_post_meta( get_the_ID(), 'surfer_keywords', true ),
 				'default_post_location'  => get_post_meta( get_the_ID(), 'surfer_location', true ),
 				// Security.
@@ -1611,7 +1719,7 @@ class Surfer {
 	/**
 	 * Disconnects post from Surfer draft
 	 *
-	 * @param WP_REST_Request $request - request object.
+	 * @param \WP_REST_Request $request - request object.
 	 * @return WP_REST_Response
 	 */
 	public function disconnect_post_from_draft( $request ) {

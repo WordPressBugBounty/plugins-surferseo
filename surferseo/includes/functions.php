@@ -101,6 +101,49 @@ function surfer_return_supported_post_types( $surfer_select_prepared = false ) {
 }
 
 /**
+ * Checks if the current user can use Surfer editor tools (sidebar, Content Sync, Writing Guidelines) for a post.
+ *
+ * The post type sent in the request is never enough - the user has to be able to edit the post.
+ * For an existing post `edit_post` is checked. Without a post (new post) the post type is taken
+ * from the current screen and the `edit_posts` capability of that post type is checked.
+ * An ID of a post that does not exist is denied - it never falls back to the screen.
+ *
+ * @param int|null $post_id - ID of the edited post, null for a new post.
+ * @return bool
+ */
+function surfer_current_user_can_use_editor_tools( ?int $post_id = null ): bool {
+
+	$post = ( null !== $post_id && $post_id > 0 ) ? get_post( $post_id ) : null;
+
+	if ( null !== $post_id && $post_id > 0 && ! $post instanceof WP_Post ) {
+		return false;
+	}
+
+	if ( $post instanceof WP_Post ) {
+		$post_type = $post->post_type;
+	} else {
+		$screen    = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
+		$post_type = ( $screen instanceof WP_Screen ) ? $screen->post_type : '';
+	}
+
+	if ( '' === $post_type || ! in_array( $post_type, surfer_return_supported_post_types(), true ) ) {
+		return false;
+	}
+
+	if ( $post instanceof WP_Post ) {
+		return current_user_can( 'edit_post', $post->ID );
+	}
+
+	$post_type_object = get_post_type_object( $post_type );
+
+	if ( null === $post_type_object ) {
+		return false;
+	}
+
+	return current_user_can( $post_type_object->cap->edit_posts );
+}
+
+/**
  * Verifies if user can perform ajax action
  *
  * @param string $nonce_name Nonce name.
@@ -123,13 +166,24 @@ function surfer_validate_ajax_request( $nonce_name = '_surfer_nonce', $action = 
 /**
  * Verifies if user can perform ajax action
  *
- * @param string $nonce_value Nonce.
- * @param string $action Action name.
+ * Capability is always checked - a nonce alone never opens the action.
+ * `true` and `false` both mean `manage_options` (`false` used to skip the check).
+ *
+ * @param string      $nonce_value Nonce.
+ * @param string      $action Action name.
+ * @param bool|string $capability Capability to check, `true`/`false` means `manage_options`.
+ * @param int|null    $object_id ID of the object to check the capability for (e.g. post ID for `edit_post`).
  * @return bool
  */
-function surfer_validate_custom_request( $nonce_value, $action = 'surfer-ajax-nonce', $require_admin = true ) {
+function surfer_validate_custom_request( $nonce_value, $action = 'surfer-ajax-nonce', $capability = true, $object_id = null ): bool {
 
-	if ( true === $require_admin && ! current_user_can( 'manage_options' ) ) {
+	if ( is_bool( $capability ) ) {
+		$capability = 'manage_options';
+	}
+
+	$user_can = null !== $object_id ? current_user_can( $capability, $object_id ) : current_user_can( $capability );
+
+	if ( ! $user_can ) {
 		return false;
 	}
 
@@ -140,6 +194,99 @@ function surfer_validate_custom_request( $nonce_value, $action = 'surfer-ajax-no
 	return true;
 }
 
+/**
+ * Returns decoded JSON body of the current AJAX request.
+ *
+ * @return object|null - null when the body is missing or is not a JSON object.
+ */
+function surfer_get_json_request_body(): ?object {
+
+	/**
+	 * Filters JSON body of the request before it is read from `php://input`.
+	 *
+	 * Value other than null replaces the body read from the request (used by tests).
+	 *
+	 * @param object|array|null $body Request body.
+	 */
+	$body = apply_filters( 'surfer_pre_json_request_body', null );
+
+	if ( null === $body ) {
+		$body = json_decode( (string) file_get_contents( 'php://input' ) );
+	} elseif ( is_array( $body ) ) {
+		$body = json_decode( (string) wp_json_encode( $body ) );
+	}
+
+	return is_object( $body ) ? $body : null;
+}
+
+/**
+ * Returns a masked form of a secret (e.g. Surfer API key) that is safe to show or log: `…abcd`.
+ *
+ * Only the last 4 characters are kept, and none for a secret that short it would be almost whole.
+ *
+ * @param mixed $secret Secret value.
+ * @return string - masked secret, empty string when the secret is not set.
+ */
+function surfer_mask_secret( $secret ): string {
+
+	if ( ! is_string( $secret ) || '' === $secret ) {
+		return '';
+	}
+
+	return '…' . ( strlen( $secret ) > 8 ? substr( $secret, -4 ) : '' );
+}
+
+/**
+ * Checks if URL points to a trusted Surfer host, so it can be used as the Surfer URL.
+ *
+ * The Surfer URL receives the API key and the connection token, and serves the writing
+ * guidelines script, so only `https` URLs on a trusted host are accepted. A host matches
+ * when it equals a trusted host or is its subdomain (`app.surferseo.com` for `surferseo.com`).
+ *
+ * @param mixed $url URL to check.
+ * @return bool
+ */
+function surfer_is_trusted_surfer_url( $url ): bool {
+
+	// FILTER_VALIDATE_URL rejects URLs that PHP and browsers parse differently (e.g. with a backslash).
+	if ( ! is_string( $url ) || '' === $url || false === filter_var( $url, FILTER_VALIDATE_URL ) ) {
+		return false;
+	}
+
+	$parts = wp_parse_url( $url );
+
+	if ( ! is_array( $parts ) || ! isset( $parts['scheme'], $parts['host'] ) || 'https' !== strtolower( $parts['scheme'] ) ) {
+		return false;
+	}
+
+	// Credentials in the URL only serve to disguise the real host.
+	if ( isset( $parts['user'] ) || isset( $parts['pass'] ) ) {
+		return false;
+	}
+
+	$host = strtolower( $parts['host'] );
+
+	/**
+	 * Filters hosts trusted as the Surfer URL. Subdomains of each host are trusted too.
+	 *
+	 * @param string[] $trusted_hosts Trusted hosts.
+	 */
+	$trusted_hosts = (array) apply_filters( 'surfer_trusted_hosts', array( 'surferseo.com' ) );
+
+	foreach ( $trusted_hosts as $trusted_host ) {
+		if ( ! is_string( $trusted_host ) || '' === $trusted_host ) {
+			continue;
+		}
+
+		$trusted_host = strtolower( $trusted_host );
+
+		if ( $host === $trusted_host || str_ends_with( $host, '.' . $trusted_host ) ) {
+			return true;
+		}
+	}
+
+	return false;
+}
 
 /**
  * Adds numerical suffix to number.
@@ -169,6 +316,42 @@ function surfer_check_if_plugins_is_active( $plugin ) {
 	} else {
 		return is_plugin_active( $plugin );
 	}
+}
+
+/**
+ * Detects which supported SEO plugin is active.
+ * Returns 'surfer' when none is, then meta is kept in Surfer's own post meta.
+ *
+ * @return string - 'yoast', 'aioseo', 'rank_math' or 'surfer'.
+ */
+function surfer_detect_active_seo_plugin() {
+
+	if ( surfer_check_if_plugins_is_active( 'wordpress-seo/wp-seo.php' ) ) {
+		return 'yoast';
+	} elseif ( surfer_check_if_plugins_is_active( 'all-in-one-seo-pack/all_in_one_seo_pack.php' ) ) {
+		return 'aioseo';
+	} elseif ( surfer_check_if_plugins_is_active( 'seo-by-rank-math/rank-math.php' ) ) {
+		return 'rank_math';
+	}
+
+	return 'surfer';
+}
+
+/**
+ * Returns where meta title and description are stored: the SEO plugin chosen
+ * in settings, or the detected one when the setting is on auto detection.
+ *
+ * @return string - 'yoast', 'aioseo', 'rank_math' or 'surfer'.
+ */
+function surfer_get_seo_meta_target() {
+
+	$chosen_seo_plugin = Surfer()->get_surfer_settings()->get_option( 'content-importer', 'default_seo_plugin', '' );
+
+	if ( '' === $chosen_seo_plugin ) {
+		$chosen_seo_plugin = surfer_detect_active_seo_plugin();
+	}
+
+	return $chosen_seo_plugin;
 }
 
 /**
@@ -209,7 +392,13 @@ function surfer_find_attachment_by_original_url( $image_url ) {
 				$image_url
 			)
 		);
-		wp_cache_set( $cache_key, $attachment_id, 'surferseo_db', 5 * MINUTE_IN_SECONDS );
+
+		// "Not found" is not cached. When a worker dies in the middle of an import (timeout
+		// while generating sizes of a big image), a cached miss made the next run import the
+		// same file again, creating another attachment every time.
+		if ( $attachment_id ) {
+			wp_cache_set( $cache_key, $attachment_id, 'surferseo_db', 5 * MINUTE_IN_SECONDS );
+		}
 	}
 
 	return $attachment_id ? (int) $attachment_id : false;
@@ -218,8 +407,8 @@ function surfer_find_attachment_by_original_url( $image_url ) {
 /**
  * Forgets cached attachment lookup for provided URL.
  *
- * Has to be called after importing an image, otherwise the cached "not found"
- * result makes the next import download the same file again.
+ * Has to be called when an attachment for the URL is created or removed, so the
+ * cached ID never points at a missing or outdated attachment.
  *
  * @param string $image_url - original URL of the image.
  * @return void
@@ -337,6 +526,332 @@ function surfer_log_image_import_error( $image_url, $error_message ) {
 }
 
 /**
+ * Returns limits of the content import and image downloads.
+ *
+ * - `content_bytes` - maximum size of the imported content,
+ * - `images_per_import` - how many images one import downloads or queues,
+ * - `queue_length` - maximum number of images waiting in the background queue,
+ * - `download_bytes` - maximum size of a downloaded image,
+ * - `download_timeout` - timeout of a single image download, in seconds,
+ * - `max_pixels` - maximum width × height of a downloaded image.
+ *
+ * @return array{content_bytes: int, images_per_import: int, queue_length: int, download_bytes: int, download_timeout: int, max_pixels: int}
+ */
+function surfer_get_import_limits(): array {
+
+	$defaults = array(
+		'content_bytes'     => 5 * MB_IN_BYTES,
+		'images_per_import' => 100,
+		'queue_length'      => 500,
+		'download_bytes'    => 10 * MB_IN_BYTES,
+		'download_timeout'  => 30,
+		'max_pixels'        => 40000000,
+	);
+
+	/**
+	 * Filters limits of the content import and image downloads.
+	 *
+	 * Values that are not numeric or are lower than 1 are replaced with the defaults.
+	 *
+	 * @param array $limits - limits, see surfer_get_import_limits().
+	 */
+	$limits = apply_filters( 'surfer_import_limits', $defaults );
+
+	if ( ! is_array( $limits ) ) {
+		$limits = array();
+	}
+
+	$result = $defaults;
+
+	foreach ( $defaults as $key => $default ) {
+		if ( isset( $limits[ $key ] ) && is_numeric( $limits[ $key ] ) && (float) $limits[ $key ] >= 1 ) {
+			$result[ $key ] = (int) $limits[ $key ];
+		}
+	}
+
+	return $result;
+}
+
+/**
+ * Downloads an image from Surfer into the media library.
+ *
+ * The download is limited in size and time. Only real images are saved - the type is
+ * detected from the downloaded file, not from the URL or the response headers.
+ *
+ * Results:
+ * - `ok` - the attachment exists, its ID is in `attachment_id`,
+ * - `not_image` - the file is not one of the accepted image types, nothing was saved,
+ * - `too_large` - the file is bigger than `download_bytes` or has more than `max_pixels`,
+ * - `error` - any other failure (network, invalid URL, media library).
+ *
+ * Every result other than `ok` is logged.
+ *
+ * @param string $url - URL of the image.
+ * @param string $alt - alt text from Surfer.
+ * @return array{status: string, attachment_id?: int}
+ */
+function surfer_download_image( string $url, string $alt = '' ): array {
+
+	if ( '' === $url || ! wp_http_validate_url( $url ) ) {
+		surfer_log_image_import_error( $url, 'invalid image URL' );
+		return array( 'status' => 'error' );
+	}
+
+	require_once ABSPATH . 'wp-admin/includes/media.php';
+	require_once ABSPATH . 'wp-admin/includes/file.php';
+	require_once ABSPATH . 'wp-admin/includes/image.php';
+
+	$limits         = surfer_get_import_limits();
+	$content_length = null;
+
+	// `download_url()` does not take request arguments, so the size limit is added for the
+	// duration of this download only.
+	$limit_response_size = function ( $args ) use ( $limits ) {
+		$args['limit_response_size'] = $limits['download_bytes'];
+		return $args;
+	};
+
+	$read_content_length = function ( $response ) use ( &$content_length ) {
+		if ( is_array( $response ) ) {
+			$content_length = wp_remote_retrieve_header( $response, 'content-length' );
+		}
+		return $response;
+	};
+
+	add_filter( 'http_request_args', $limit_response_size, PHP_INT_MAX );
+	add_filter( 'http_response', $read_content_length, PHP_INT_MAX );
+
+	try {
+		$tmp_file = download_url( $url, $limits['download_timeout'] );
+	} finally {
+		remove_filter( 'http_request_args', $limit_response_size, PHP_INT_MAX );
+		remove_filter( 'http_response', $read_content_length, PHP_INT_MAX );
+	}
+
+	if ( is_wp_error( $tmp_file ) ) {
+		surfer_log_image_import_error( $url, $tmp_file->get_error_message() );
+		return array( 'status' => 'error' );
+	}
+
+	$status = surfer_check_downloaded_image( $tmp_file, $content_length, $limits );
+
+	if ( 'ok' !== $status['status'] ) {
+		@unlink( $tmp_file ); // phpcs:ignore
+		surfer_log_image_import_error( $url, $status['message'] );
+		return array( 'status' => $status['status'] );
+	}
+
+	$file_name = surfer_resolve_image_file_name( $url, $tmp_file );
+
+	// Mime type is intentionally not provided - WordPress detects it from the
+	// downloaded file, so images from URLs without an extension are not rejected.
+	//
+	// Surfer meta is saved together with the attachment, before its sizes are generated.
+	// Generating sizes of a big image can take longer than PHP allows - when the process
+	// is killed there, the next run has to find this attachment instead of importing the
+	// same file again.
+	$attachment_id = media_handle_sideload(
+		array(
+			'tmp_name' => $tmp_file,
+			'name'     => $file_name,
+		),
+		0,
+		null,
+		array(
+			'meta_input' => array(
+				'surfer_file_name'         => $file_name,
+				'surfer_file_original_url' => $url,
+			),
+		)
+	);
+
+	if ( file_exists( $tmp_file ) ) {
+		@unlink( $tmp_file ); // phpcs:ignore
+	}
+
+	if ( is_wp_error( $attachment_id ) || empty( $attachment_id ) ) {
+		$error_message = is_wp_error( $attachment_id ) ? $attachment_id->get_error_message() : 'attachment was not created';
+		surfer_log_image_import_error( $url, $error_message );
+		return array( 'status' => 'error' );
+	}
+
+	surfer_forget_attachment_by_original_url( $url );
+	surfer_update_image_alt( (int) $attachment_id, $alt );
+
+	return array(
+		'status'        => 'ok',
+		'attachment_id' => (int) $attachment_id,
+	);
+}
+
+/**
+ * Checks a downloaded file against the image type whitelist and the size limits.
+ *
+ * The type is checked first - a file that is not an image keeps its remote URL whatever
+ * its size, and a file cut at the size limit still has its header, so a real image is
+ * recognized and then reported as too large.
+ *
+ * `limit_response_size` silently cuts the file at the limit, so a file of exactly the
+ * limit size (or a response announcing more) is treated as too large.
+ *
+ * @param string             $file_path - path to the downloaded file.
+ * @param mixed              $content_length - `Content-Length` header of the response, if known.
+ * @param array<string, int> $limits - limits from surfer_get_import_limits().
+ * @return array{status: string, message: string}
+ */
+function surfer_check_downloaded_image( string $file_path, $content_length, array $limits ): array {
+
+	if ( is_array( $content_length ) ) {
+		$content_length = end( $content_length );
+	}
+
+	$allowed_types = array( 'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/avif' );
+	$mime_type     = wp_get_image_mime( $file_path );
+
+	if ( ! in_array( $mime_type, $allowed_types, true ) ) {
+		return array(
+			'status'  => 'not_image',
+			'message' => 'file is not an accepted image (' . ( $mime_type ? $mime_type : 'unknown type' ) . '), remote URL kept',
+		);
+	}
+
+	$file_size = (int) filesize( $file_path );
+
+	if ( $file_size >= $limits['download_bytes'] || ( is_numeric( $content_length ) && (float) $content_length > $limits['download_bytes'] ) ) {
+		return array(
+			'status'  => 'too_large',
+			'message' => 'file is larger than ' . $limits['download_bytes'] . ' bytes',
+		);
+	}
+
+	$image_size = wp_getimagesize( $file_path );
+
+	if ( is_array( $image_size ) && (float) $image_size[0] * (float) $image_size[1] > $limits['max_pixels'] ) {
+		return array(
+			'status'  => 'too_large',
+			'message' => 'image has more than ' . $limits['max_pixels'] . ' pixels',
+		);
+	}
+
+	return array(
+		'status'  => 'ok',
+		'message' => '',
+	);
+}
+
+/**
+ * Calls the callback for the `src` attribute of every `<img>` tag in the HTML.
+ *
+ * The callback gets the decoded value (`&amp;` becomes `&`) and returns the new raw
+ * value of the attribute, already escaped, or null to leave the attribute unchanged.
+ * Attributes are read one by one, so `src` inside another attribute's value (or
+ * `data-src`) is never taken for the image source.
+ *
+ * @param string   $html - HTML to process.
+ * @param callable $callback - receives decoded `src`, returns new escaped value or null.
+ * @return string
+ */
+function surfer_map_img_src( string $html, callable $callback ): string {
+
+	if ( false === stripos( $html, '<img' ) ) {
+		return $html;
+	}
+
+	$result = preg_replace_callback(
+		'~(<img)\b((?:[^>"\']++|"[^"]*+"|\'[^\']*+\')*+)>~i',
+		function ( $tag ) use ( $callback ) {
+			$attributes = preg_replace_callback(
+				'~(\s+)([^\s=/>"\']+)(?:(\s*=\s*)("[^"]*"|\'[^\']*\'|[^\s"\'>]+))?~',
+				function ( $attribute ) use ( $callback ) {
+					if ( 'src' !== strtolower( $attribute[2] ) || ! isset( $attribute[4] ) ) {
+						return $attribute[0];
+					}
+
+					$quote = $attribute[4][0];
+					$value = $attribute[4];
+
+					if ( '"' === $quote || "'" === $quote ) {
+						$value = substr( $value, 1, -1 );
+					} else {
+						$quote = '"';
+					}
+
+					$new_value = $callback( html_entity_decode( $value, ENT_QUOTES | ENT_HTML5, 'UTF-8' ) );
+
+					if ( null === $new_value ) {
+						return $attribute[0];
+					}
+
+					return $attribute[1] . $attribute[2] . $attribute[3] . $quote . $new_value . $quote;
+				},
+				$tag[2]
+			);
+
+			return $tag[1] . $attributes . '>';
+		},
+		$html
+	);
+
+	return is_string( $result ) ? $result : $html;
+}
+
+/**
+ * Replaces the image source in `<img>` tags whose `src` is exactly the provided URL.
+ *
+ * Other occurrences of the URL (text, links, longer URLs starting the same way) are
+ * left untouched. The new URL is escaped with `esc_url()`.
+ *
+ * @param string $html - HTML to process.
+ * @param string $from_url - URL to replace, compared with the decoded `src` value.
+ * @param string $to_url - new URL of the image.
+ * @return string
+ */
+function surfer_replace_img_src( string $html, string $from_url, string $to_url ): string {
+
+	$escaped_url = esc_url( $to_url );
+
+	if ( '' === $from_url || '' === $escaped_url ) {
+		return $html;
+	}
+
+	return surfer_map_img_src(
+		$html,
+		function ( $src ) use ( $from_url, $escaped_url ) {
+			return $src === $from_url ? $escaped_url : null;
+		}
+	);
+}
+
+/**
+ * Checks if any `<img>` tag in the HTML has `src` exactly equal to the provided URL.
+ *
+ * @param string $html - HTML to check.
+ * @param string $image_url - URL of the image, compared with the decoded `src` value.
+ * @return bool
+ */
+function surfer_content_has_img_src( string $html, string $image_url ): bool {
+
+	$found = false;
+
+	if ( '' === $image_url ) {
+		return false;
+	}
+
+	surfer_map_img_src(
+		$html,
+		function ( $src ) use ( $image_url, &$found ) {
+			if ( $src === $image_url ) {
+				$found = true;
+			}
+
+			return null;
+		}
+	);
+
+	return $found;
+}
+
+/**
  * Updates alt text of an attachment imported from Surfer.
  *
  * Rules:
@@ -392,6 +907,10 @@ function surfer_update_image_alt( $image_id, $image_alt = '' ) {
 function surfer_acquire_lock( $lock_name, $timeout = 60 ) {
 	$option_name = 'surfer_lock_' . $lock_name;
 	$now         = time();
+
+	// Every attempt reads the lock from the database - a value cached by an earlier attempt
+	// in this request would hide that another request has released the lock since.
+	wp_cache_delete( $option_name, 'options' );
 
 	if ( add_option( $option_name, $now, '', false ) ) {
 		return true;

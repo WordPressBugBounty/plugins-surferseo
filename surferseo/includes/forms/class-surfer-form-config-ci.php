@@ -18,6 +18,7 @@ use SurferSEO\Forms\Fields\Surfer_Form_Element_Header;
 use SurferSEO\Forms\Fields\Surfer_Form_Element_Text;
 use SurferSEO\Forms\Fields\Surfer_Form_Element_Select;
 use SurferSEO\Forms\Validators\Validator_Is_Required;
+use SurferSEO\Forms\Validators\Validator_Is_Trusted_Surfer_Url;
 use SurferSEO\Surfer\GSC\Surfer_GSC_Common;
 use SurferSEO\Surfer\Content_Parsers\Parsers_Controller;
 
@@ -333,16 +334,19 @@ class Surfer_Form_Config_Ci extends Surfer_Form {
 		$field->set_hint( __( '[DEVELOPER FIELD] URL to Surfer, the API URL is derived from it. Change only if you are sure what you are doing.', 'surferseo' ) );
 		$field->set_classes( 'regular-text' );
 		$field->add_validator( new Validator_Is_Required() );
+		// The URL gets the API key and tracking data, so only Surfer hosts may be saved.
+		$field->add_validator( new Validator_Is_Trusted_Surfer_Url() );
 		$this->add_field( $field );
 
 		$field = new Surfer_Form_Element_Text( 'wpsurfer_api_access_key' );
 		$field->set_label( __( 'Surfer API Key', 'surferseo' ) );
-		$field->set_hint( __( '[DEVELOPER FIELD] API key used to make requests to Surfer API. Leave empty to keep the current one.', 'surferseo' ) );
+		$field->set_hint( $this->get_api_key_hint() );
 		$field->set_classes( 'regular-text' );
 		// The key lives in its own option, so it is neither bound from nor saved into the
 		// module settings - otherwise a leftover copy there would shadow the real value.
 		$field->set_store_in_options( false );
-		$field->set_value( get_option( 'wpsurfer_api_access_key', '' ) );
+		// Write-only field: the key never goes back to the browser, the hint says if one is set.
+		$field->set_value( '' );
 		$this->add_field( $field );
 
 		$field = new Surfer_Form_Element_Text( 'surfer_test_gsc_export' );
@@ -355,12 +359,6 @@ class Surfer_Form_Config_Ci extends Surfer_Form {
 		$field->set_label( __( 'Reconnect all posts with Drafts in Surfer', 'surferseo' ) );
 		$field->set_hint( __( 'On click all Surfer posts connected to any draft, will be reconnected (content from WordPress will be exported to Surfer).', 'surferseo' ) );
 		$field->set_renderer( array( $this, 'render_reconnect_posts_with_drafts' ) );
-		$this->add_field( $field );
-
-		$field = new Surfer_Form_Element_Text( 'surfer_remove_old_surfer_backups' );
-		$field->set_label( __( 'Remove old Surfer backups', 'surferseo' ) );
-		$field->set_hint( __( 'On click old Surfer backups (created on post import) will be removed.', 'surferseo' ) );
-		$field->set_renderer( array( $this, 'render_clear_backups' ) );
 		$this->add_field( $field );
 	}
 
@@ -377,7 +375,7 @@ class Surfer_Form_Config_Ci extends Surfer_Form {
 	/**
 	 * Renders Surfer connection button.
 	 *
-	 * @param Surfer_Form_Element $field - field object.
+	 * @param \SurferSEO\Forms\Fields\Surfer_Form_Element $field - field object.
 	 * @return void
 	 */
 	public function render_connection_button( $field ) {
@@ -455,7 +453,7 @@ class Surfer_Form_Config_Ci extends Surfer_Form {
 	/**
 	 * Renders button to connect with GSC.
 	 *
-	 * @param Surfer_Form_Element $field - field object.
+	 * @param \SurferSEO\Forms\Fields\Surfer_Form_Element $field - field object.
 	 */
 	public function render_gsc_connection( $field ) {
 		$connected = Surfer()->get_surfer()->get_gsc()->check_if_gsc_connected( true );
@@ -514,7 +512,7 @@ class Surfer_Form_Config_Ci extends Surfer_Form {
 	/**
 	 * Renders switch
 	 *
-	 * @param Surfer_Form_Element $field - field object.
+	 * @param \SurferSEO\Forms\Fields\Surfer_Form_Element_Multichoice $field - field object.
 	 */
 	public function render_switch( $field ) {
 
@@ -550,7 +548,7 @@ class Surfer_Form_Config_Ci extends Surfer_Form {
 	/**
 	 * Renders button to test GSC connection.
 	 *
-	 * @param Surfer_Form_Element $field - field object.
+	 * @param \SurferSEO\Forms\Fields\Surfer_Form_Element $field - field object.
 	 */
 	public function render_test_gsc_export( $field ) {
 
@@ -576,7 +574,7 @@ class Surfer_Form_Config_Ci extends Surfer_Form {
 	/**
 	 * Renders button to reconnect posts with Drafts (make export again).
 	 *
-	 * @param Surfer_Form_Element $field - field object.
+	 * @param \SurferSEO\Forms\Fields\Surfer_Form_Element $field - field object.
 	 * @return void
 	 */
 	public function render_reconnect_posts_with_drafts( $field ) {
@@ -592,31 +590,6 @@ class Surfer_Form_Config_Ci extends Surfer_Form {
 				</button>
 
 				<div class="surfer-reconnect-posts-with-drafts-box__result"></div>
-			</div>
-		<?php
-		$html = ob_get_clean();
-
-		echo wp_kses_post( $html );
-	}
-
-	/**
-	 * Renders button to clear backups.
-	 *
-	 * @param Surfer_Form_Element $field - field object.
-	 */
-	public function render_clear_backups( $field ) {
-
-		ob_start();
-		?>
-
-			<div class="surfer-remove-surfer-backups-box <?php echo esc_html( $field->get_classes() ); ?>">
-				<p><?php echo wp_kses_post( $field->get_hint() ); ?></p>
-
-				<button class="surfer-button surfer-button--secondary surfer-button--small surfer-remove-surfer-backups-box__button">
-					<?php esc_html_e( 'Remove Surfer Backups', 'surferseo' ); ?>
-				</button>
-
-				<div class="surfer-remove-surfer-backups-box__result"></div>
 			</div>
 		<?php
 		$html = ob_get_clean();
@@ -685,12 +658,30 @@ class Surfer_Form_Config_Ci extends Surfer_Form {
 		// Autoload off, the same way the connection flow saves it.
 		update_option( 'wpsurfer_api_access_key', $api_key, false );
 
-		// The form is rendered after saving, so the field has to show the new key.
+		// The form is rendered after saving, so the hint has to describe the new key.
 		$field = $this->get_field( 'wpsurfer_api_access_key' );
 
 		if ( $field ) {
-			$field->set_value( $api_key );
+			$field->set_hint( $this->get_api_key_hint() );
 		}
+	}
+
+	/**
+	 * Returns hint for the developer API key field, telling if the key is set (with its last characters).
+	 *
+	 * @return string
+	 */
+	private function get_api_key_hint() {
+		$api_key_mask = surfer_mask_secret( get_option( 'wpsurfer_api_access_key', '' ) );
+
+		if ( '' === $api_key_mask ) {
+			$status = __( 'No API key is set.', 'surferseo' );
+		} else {
+			/* translators: %s - masked API key, e.g. "…abcd". */
+			$status = sprintf( __( 'API key is set (%s).', 'surferseo' ), $api_key_mask );
+		}
+
+		return __( '[DEVELOPER FIELD] API key used to make requests to Surfer API. Leave empty to keep the current one.', 'surferseo' ) . ' ' . $status;
 	}
 
 	/**

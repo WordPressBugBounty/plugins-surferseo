@@ -53,6 +53,20 @@ class Surfer_Installer {
 	}
 
 	/**
+	 * Runs deactivation actions.
+	 *
+	 * The image queue is kept, so images waiting for the import are localized after the
+	 * plugin is activated again - only the scheduled run is removed.
+	 *
+	 * @return void
+	 */
+	public function deactivate() {
+		wp_clear_scheduled_hook( 'surfer_process_image_queue' );
+		delete_option( 'surfer_lock_image_queue_run' );
+		delete_option( 'surfer_lock_image_queue' );
+	}
+
+	/**
 	 * Returns true if we're installing.
 	 *
 	 * @return bool

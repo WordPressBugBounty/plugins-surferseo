@@ -49,7 +49,7 @@ class Gutenberg_Parser extends Content_Parser {
 	/**
 	 * Function iterates by HTML tags in provided content.
 	 *
-	 * @param DOMNode|DOMDocument|DOMElement $parent_node - node to parse.
+	 * @param \DOMNode|\DOMDocument|\DOMElement $parent_node - node to parse.
 	 * @param string                         $content     - reference to content variable, to store Gutenberg output.
 	 * @return void
 	 */
@@ -89,7 +89,7 @@ class Gutenberg_Parser extends Content_Parser {
 	/**
 	 * Function prepares attributes and run correct parser function for certain node type.
 	 *
-	 * @param DOMNode|DOMDocument|DOMElement $node - node to parse.
+	 * @param \DOMNode|\DOMDocument|\DOMElement $node - node to parse.
 	 * @return string
 	 */
 	private function parse_certain_node_type( $node ) {
@@ -147,7 +147,7 @@ class Gutenberg_Parser extends Content_Parser {
 	/**
 	 * Functions prepare attributes for HTML and Gutenberg tags.
 	 *
-	 * @param DOMNode|DOMDocument|DOMElement $node - node to parse.
+	 * @param \DOMNode|\DOMDocument|\DOMElement $node - node to parse.
 	 * @return array
 	 */
 	private function parse_node_attributes( $node ) {
@@ -246,7 +246,7 @@ class Gutenberg_Parser extends Content_Parser {
 	/**
 	 * Parses <p> node.
 	 *
-	 * @param DOMNode|DOMDocument|DOMElement $node                - node to parse.
+	 * @param \DOMNode|\DOMDocument|\DOMElement $node                - node to parse.
 	 * @param array                          $attributes          - HTML attributes for the node, example: class="" src="".
 	 * @param string                         $gutenberg_attribute - Attributes for Gutenberg tag.
 	 * @return string
@@ -272,7 +272,7 @@ class Gutenberg_Parser extends Content_Parser {
 	/**
 	 * Parses <h1-6> nodes
 	 *
-	 * @param DOMNode|DOMDocument|DOMElement $node                - node to parse.
+	 * @param \DOMNode|\DOMDocument|\DOMElement $node                - node to parse.
 	 * @param array                          $attributes          - HTML attributes for the node, example: class="" src="".
 	 * @param string                         $gutenberg_attribute - Attributes for Gutenberg tag.
 	 * @return string
@@ -302,7 +302,7 @@ class Gutenberg_Parser extends Content_Parser {
 	/**
 	 * Parses <img> node.
 	 *
-	 * @param DOMNode|DOMDocument|DOMElement $node                - node to parse.
+	 * @param \DOMNode|\DOMDocument|\DOMElement $node                - node to parse.
 	 * @param array                          $attributes          - HTML attributes for the node, example: class="" src="".
 	 * @param string                         $gutenberg_attribute - Attributes for Gutenberg tag.
 	 * @return string
@@ -347,7 +347,7 @@ class Gutenberg_Parser extends Content_Parser {
 	/**
 	 * Parses <ul> node.
 	 *
-	 * @param DOMNode|DOMDocument|DOMElement $node                - node to parse.
+	 * @param \DOMNode|\DOMDocument|\DOMElement $node                - node to parse.
 	 * @param array                          $attributes          - HTML attributes for the node, example: class="" src="".
 	 * @param string                         $gutenberg_attribute - Attributes for Gutenberg tag.
 	 * @return string
@@ -374,7 +374,7 @@ class Gutenberg_Parser extends Content_Parser {
 	/**
 	 * Parses <ol> node.
 	 *
-	 * @param DOMNode|DOMDocument|DOMElement $node                - node to parse.
+	 * @param \DOMElement $node                - node to parse.
 	 * @param array                          $attributes          - HTML attributes for the node, example: class="" src="".
 	 * @param string                         $gutenberg_attribute - Attributes for Gutenberg tag.
 	 * @return string
@@ -407,7 +407,7 @@ class Gutenberg_Parser extends Content_Parser {
 	/**
 	 * Parses <hr> node.
 	 *
-	 * @param DOMNode|DOMDocument|DOMElement $node                - node to parse.
+	 * @param \DOMNode|\DOMDocument|\DOMElement $node                - node to parse.
 	 * @param array                          $attributes          - HTML attributes for the node, example: class="" src="".
 	 * @param string                         $gutenberg_attribute - Attributes for Gutenberg tag.
 	 * @return string
@@ -426,7 +426,7 @@ class Gutenberg_Parser extends Content_Parser {
 	/**
 	 * Parses <blockquote> node.
 	 *
-	 * @param DOMNode|DOMDocument|DOMElement $node                - node to parse.
+	 * @param \DOMNode|\DOMDocument|\DOMElement $node                - node to parse.
 	 * @param array                          $attributes          - HTML attributes for the node, example: class="" src="".
 	 * @param string                         $gutenberg_attribute - Attributes for Gutenberg tag.
 	 * @return string
@@ -448,7 +448,7 @@ class Gutenberg_Parser extends Content_Parser {
 	/**
 	 * Parses <pre> node.
 	 *
-	 * @param DOMNode|DOMDocument|DOMElement $node                - node to parse.
+	 * @param \DOMNode|\DOMDocument|\DOMElement $node                - node to parse.
 	 * @param array                          $attributes          - HTML attributes for the node, example: class="" src="".
 	 * @param string                         $gutenberg_attribute - Attributes for Gutenberg tag.
 	 * @return string
@@ -472,7 +472,7 @@ class Gutenberg_Parser extends Content_Parser {
 	/**
 	 * Parses <table> node.
 	 *
-	 * @param DOMNode|DOMDocument|DOMElement $node                - node to parse.
+	 * @param \DOMElement $node                - node to parse.
 	 * @param array                          $attributes          - HTML attributes for the node, example: class="" src"".
 	 * @param string                         $gutenberg_attribute - Attributes for Gutenberg tag.
 	 * @return string

@@ -142,7 +142,7 @@ class Elementor_Parser extends Content_Parser {
 	/**
 	 * Function iterates by HTML tags in provided content.
 	 *
-	 * @param DOMDocument $parent_node - node to parse.
+	 * @param \DOMDocument $parent_node - node to parse.
 	 * @param array       $content     - reference to content variable, to store Gutenberg output.
 	 * @param array       $elementor_styling - array with Elementor styling.
 	 * @return void
@@ -185,7 +185,7 @@ class Elementor_Parser extends Content_Parser {
 	/**
 	 * Function prepares attributes and run correct parser function for certain node type.
 	 *
-	 * @param DOMElement $node - node to parse.
+	 * @param \DOMElement $node - node to parse.
 	 * @param array      $elementor_styling - array with Elementor styling.
 	 * @return string
 	 */
@@ -228,9 +228,9 @@ class Elementor_Parser extends Content_Parser {
 	/**
 	 * Parses <p> node.
 	 *
-	 * @param DOMElement $node - node to parse.
+	 * @param \DOMElement $node - node to parse.
 	 * @param array      $elementor_styling - array with Elementor styling.
-	 * @return stdClass
+	 * @return \stdClass
 	 */
 	private function parse_node_p( $node, $elementor_styling ) {
 
@@ -261,9 +261,9 @@ class Elementor_Parser extends Content_Parser {
 	/**
 	 * Parses <ul> node.
 	 *
-	 * @param DOMElement $node - node to parse.
+	 * @param \DOMElement $node - node to parse.
 	 * @param array      $elementor_styling - array with Elementor styling.
-	 * @return stdClass
+	 * @return \stdClass
 	 */
 	private function parse_node_ul( $node, $elementor_styling ) {
 
@@ -294,9 +294,9 @@ class Elementor_Parser extends Content_Parser {
 	/**
 	 * Parses <ol> node.
 	 *
-	 * @param DOMElement $node - node to parse.
+	 * @param \DOMElement $node - node to parse.
 	 * @param array      $elementor_styling - array with Elementor styling.
-	 * @return stdClass
+	 * @return \stdClass
 	 */
 	private function parse_node_ol( $node, $elementor_styling ) {
 
@@ -327,7 +327,7 @@ class Elementor_Parser extends Content_Parser {
 	/**
 	 * Parses <h1-6> nodes
 	 *
-	 * @param DOMElement $node - node to parse.
+	 * @param \DOMElement $node - node to parse.
 	 * @param array      $elementor_styling - array with Elementor styling.
 	 * @return string
 	 */
@@ -358,7 +358,7 @@ class Elementor_Parser extends Content_Parser {
 	/**
 	 * Parses <img> node.
 	 *
-	 * @param DOMElement $node - node to parse.
+	 * @param \DOMElement $node - node to parse.
 	 * @param array      $elementor_styling - array with Elementor styling.
 	 * @return string
 	 */
@@ -409,7 +409,7 @@ class Elementor_Parser extends Content_Parser {
 	/**
 	 * Parses <blockquote> node.
 	 *
-	 * @param DOMElement $node - node to parse.
+	 * @param \DOMElement $node - node to parse.
 	 * @param array      $elementor_styling - array with Elementor styling.
 	 * @return string
 	 */
@@ -441,7 +441,7 @@ class Elementor_Parser extends Content_Parser {
 	/**
 	 * Parses <table> node.
 	 *
-	 * @param DOMNode|DOMDocument|DOMElement $node                - node to parse.
+	 * @param \DOMNode|\DOMDocument|\DOMElement $node                - node to parse.
 	 * @param array                          $elementor_styling - array with Elementor styling.
 	 * @return string
 	 */
@@ -478,7 +478,7 @@ class Elementor_Parser extends Content_Parser {
 	/**
 	 * Functions prepare attributes for HTML and Gutenberg tags.
 	 *
-	 * @param DOMElement $node - node to parse.
+	 * @param \DOMElement $node - node to parse.
 	 * @return array
 	 */
 	private function parse_node_attributes( $node ) {

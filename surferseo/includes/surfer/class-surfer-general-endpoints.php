@@ -73,10 +73,10 @@ class Surfer_General_Endpoints {
 	 */
 	public function get_user_drafts() {
 
-		$json = file_get_contents( 'php://input' );
-		$data = json_decode( $json );
+		$data  = surfer_get_json_request_body();
+		$nonce = isset( $data->_surfer_nonce ) ? $data->_surfer_nonce : '';
 
-		if ( ! surfer_validate_custom_request( $data->_surfer_nonce, 'surfer-ajax-nonce', false ) ) {
+		if ( ! surfer_validate_custom_request( $nonce, 'surfer-ajax-nonce', 'edit_posts' ) ) {
 			echo wp_json_encode( array( 'message' => 'Security check failed.' ) );
 			wp_die();
 		}
@@ -213,10 +213,10 @@ class Surfer_General_Endpoints {
 	 */
 	public function get_user_credits() {
 
-		$json = file_get_contents( 'php://input' );
-		$data = json_decode( $json );
+		$data  = surfer_get_json_request_body();
+		$nonce = isset( $data->_surfer_nonce ) ? $data->_surfer_nonce : '';
 
-		if ( ! surfer_validate_custom_request( $data->_surfer_nonce, 'surfer-ajax-nonce', false ) ) {
+		if ( ! surfer_validate_custom_request( $nonce, 'surfer-ajax-nonce', 'edit_posts' ) ) {
 			echo wp_json_encode( array( 'message' => 'Security check failed.' ) );
 			wp_die();
 		}
@@ -234,10 +234,10 @@ class Surfer_General_Endpoints {
 	 * Returns user workspaces from Surfer.
 	 */
 	public function get_user_workspaces() {
-		$json = file_get_contents( 'php://input' );
-		$data = json_decode( $json );
+		$data  = surfer_get_json_request_body();
+		$nonce = isset( $data->_surfer_nonce ) ? $data->_surfer_nonce : '';
 
-		if ( ! surfer_validate_custom_request( $data->_surfer_nonce, 'surfer-ajax-nonce', false ) ) {
+		if ( ! surfer_validate_custom_request( $nonce, 'surfer-ajax-nonce', 'edit_posts' ) ) {
 			echo wp_json_encode( array( 'message' => 'Security check failed.' ) );
 			wp_die();
 		}

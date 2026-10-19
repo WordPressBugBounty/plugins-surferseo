@@ -49,6 +49,13 @@ class Elementor {
 	 */
 	public function enqueue_scripts_and_styles_in_elementor() {
 
+		// Elementor checks `edit_post` before this hook, this is defense in depth.
+		$post_id = class_exists( '\Elementor\Plugin' ) ? (int) \Elementor\Plugin::instance()->editor->get_post_id() : 0;
+
+		if ( ! surfer_current_user_can_use_editor_tools( $post_id > 0 ? $post_id : null ) ) {
+			return;
+		}
+
 		wp_enqueue_style( 'surfer-components', Surfer()->get_baseurl() . 'assets/css/components.css', array(), SURFER_VERSION );
 		wp_enqueue_style( 'surfer-styles', Surfer()->get_baseurl() . 'assets/css/surferseo.css', array(), SURFER_VERSION );
 		wp_enqueue_style( 'surfer-elementor-integration', Surfer()->get_baseurl() . 'assets/css/surfer-elementor-integration.css', array(), SURFER_VERSION );

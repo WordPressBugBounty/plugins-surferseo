@@ -285,7 +285,7 @@ abstract class Surfer_Form_Element {
 	/**
 	 * Sets row css classes.
 	 *
-	 * @param string $classes - CSS classes.
+	 * @param string $row_classes - CSS classes.
 	 * @return void
 	 */
 	public function set_row_classes( $row_classes ) {
@@ -361,7 +361,7 @@ abstract class Surfer_Form_Element {
 	/**
 	 * Adds new validator to list.
 	 *
-	 * @param Surfer_Validator $validator - validator.
+	 * @param \SurferSEO\Forms\Validators\Surfer_Validator_Interface $validator - validator.
 	 * @return void
 	 */
 	public function add_validator( $validator ) {

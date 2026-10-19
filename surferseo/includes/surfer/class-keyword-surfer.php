@@ -40,8 +40,21 @@ class Keyword_Surfer {
 	 * Enqueue sidebar script.
 	 */
 	public function include_keyword_surfer_scripts() {
-		$screen = get_current_screen();
+		$screen = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
+
+		// Only post edit screen (post.php and post-new.php) of a supported post type.
+		if ( ! $screen instanceof \WP_Screen || 'post' !== $screen->base ) {
+			return;
+		}
+
 		if ( ! in_array( $screen->post_type, surfer_return_supported_post_types(), true ) ) {
+			return;
+		}
+
+		// On post-new.php it is the auto-draft created by core.
+		$post = get_post();
+
+		if ( ! surfer_current_user_can_use_editor_tools( $post instanceof \WP_Post ? $post->ID : null ) ) {
 			return;
 		}
 

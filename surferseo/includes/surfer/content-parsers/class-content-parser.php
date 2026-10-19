@@ -31,6 +31,26 @@ class Content_Parser {
 	 */
 	protected $image_processing_mode = 'sync';
 
+	/**
+	 * Receives images left for the background download - see Parsers_Controller.
+	 *
+	 * Without it images are always downloaded during the import, because nothing would
+	 * queue them.
+	 *
+	 * @var callable|null
+	 */
+	protected $pending_image_handler = null;
+
+	/**
+	 * Decides if another image of the import may be downloaded or queued - see Parsers_Controller.
+	 *
+	 * Called with the image URL, returns false when the import reached its image limit.
+	 * Without it the number of images is not limited.
+	 *
+	 * @var callable|null
+	 */
+	protected $image_limit_handler = null;
+
 
 	/**
 	 * Returns content for chosen editor.
@@ -96,165 +116,77 @@ class Content_Parser {
 	 * @param string $image_url - URL of the image.
 	 * @param string $image_alt - Alt text for the image.
 	 * @param bool   $url_only - return only URL.
-	 * @return string
+	 * @return string|array
 	 */
 	protected function download_img_to_media_library( $image_url, $image_alt, $url_only = true ) {
 
 		$existing_attachment = surfer_find_attachment_by_original_url( $image_url );
 		if ( $existing_attachment ) {
 			surfer_update_image_alt( $existing_attachment, $image_alt );
-			if ( $url_only ) {
-				return wp_get_attachment_url( $existing_attachment );
-			}
-			return array(
-				'url' => wp_get_attachment_url( $existing_attachment ),
-				'id'  => $existing_attachment,
-			);
+			return $this->image_result( wp_get_attachment_url( $existing_attachment ), $existing_attachment, $url_only );
+		}
+
+		// One import downloads or queues a limited number of images - the rest keep their
+		// Surfer URLs. The limit is logged once per import, by the handler.
+		if ( null !== $this->image_limit_handler && ! call_user_func( $this->image_limit_handler, $image_url ) ) {
+			return $this->image_result( $image_url, 0, $url_only );
 		}
 
 		// The Surfer URL stays in the content only until the background job downloads the
-		// image and replaces it - see Surfer_Image_Processor.
-		if ( 'async' === $this->image_processing_mode ) {
-			$this->queue_image_download( $image_url, $image_alt );
-			if ( $url_only ) {
-				return $image_url;
-			}
-			return array(
-				'url' => $image_url,
-				'id'  => 0,
-			);
+		// image and replaces it - see Surfer_Image_Processor. The image is only remembered
+		// here: it is queued by the importer once the post is saved and has an ID, so the
+		// worker changes only that post.
+		if ( 'async' === $this->image_processing_mode && null !== $this->pending_image_handler ) {
+			call_user_func( $this->pending_image_handler, $image_url, $image_alt );
+			return $this->image_result( $image_url, 0, $url_only );
 		}
 
-		$image_upload = $this->download_image_sync( $image_url );
+		$result = $this->download_image_sync( $image_url, $image_alt );
+
+		if ( 'ok' === $result['status'] && ! empty( $result['attachment_id'] ) ) {
+			return $this->image_result( wp_get_attachment_url( $result['attachment_id'] ), $result['attachment_id'], $url_only );
+		}
+
+		// A file that is not an image is not imported at all - the content keeps its URL.
+		if ( 'not_image' === $result['status'] ) {
+			return $this->image_result( $image_url, 0, $url_only );
+		}
 
 		// A failed image is replaced with a placeholder instead of being hotlinked to
 		// Surfer - otherwise the post looks fine and nobody notices that the media
-		// library is empty. The reason is logged in download_image_sync().
-		if ( ! $image_upload ) {
-			if ( $url_only ) {
-				return surfer_get_failed_image_url();
-			}
-			return array(
-				'url' => surfer_get_failed_image_url(),
-				'id'  => 0,
-			);
-		}
+		// library is empty. The reason is logged by surfer_download_image().
+		return $this->image_result( surfer_get_failed_image_url(), 0, $url_only );
+	}
 
-		surfer_update_image_alt( $image_upload['id'], $image_alt );
+	/**
+	 * Returns image data in the form the parser asked for.
+	 *
+	 * @param string|false $url - URL of the image.
+	 * @param int          $attachment_id - ID of the attachment, 0 when there is none.
+	 * @param bool         $url_only - return only URL.
+	 * @return string|array
+	 */
+	private function image_result( $url, $attachment_id, $url_only ) {
 
 		if ( $url_only ) {
-			return $image_upload['url'];
+			return $url;
 		}
-		return $image_upload;
-	}
-
-	/**
-	 * Queue image for background download.
-	 *
-	 * @param string $image_url - URL of the image.
-	 * @param string $image_alt - Alt text for the image.
-	 * @return void
-	 */
-	private function queue_image_download( $image_url, $image_alt ) {
-
-		$lock_acquired = surfer_acquire_lock( 'image_queue' );
-
-		$queue = get_option( 'surfer_image_download_queue', array() );
-
-		if ( ! $this->is_image_queued( $queue, $image_url ) ) {
-			$queue[] = array(
-				'url'       => $image_url,
-				'alt'       => $image_alt,
-				'timestamp' => time(),
-			);
-			update_option( 'surfer_image_download_queue', $queue, false );
-		}
-
-		if ( $lock_acquired ) {
-			surfer_release_lock( 'image_queue' );
-		}
-
-		if ( ! wp_next_scheduled( 'surfer_process_image_queue' ) ) {
-			wp_schedule_single_event( time() + 5, 'surfer_process_image_queue' );
-		}
-	}
-
-	/**
-	 * Checks if image is already waiting in the queue.
-	 *
-	 * @param array  $queue - current queue.
-	 * @param string $image_url - URL of the image.
-	 * @return bool
-	 */
-	private function is_image_queued( $queue, $image_url ) {
-
-		if ( ! is_array( $queue ) ) {
-			return false;
-		}
-
-		foreach ( $queue as $item ) {
-			if ( isset( $item['url'] ) && $item['url'] === $image_url ) {
-				return true;
-			}
-		}
-
-		return false;
-	}
-
-	/**
-	 * Upload image from Surfer to WordPress and replace src to local one.
-	 *
-	 * @param string $image_url - URL to the image.
-	 * @return array|int - array with attachment URL and ID, 0 on failure.
-	 */
-	private function download_image_sync( $image_url ) {
-
-		if ( empty( $image_url ) || ! wp_http_validate_url( $image_url ) ) {
-			surfer_log_image_import_error( $image_url, 'invalid image URL' );
-			return 0;
-		}
-
-		require_once ABSPATH . 'wp-admin/includes/media.php';
-		require_once ABSPATH . 'wp-admin/includes/file.php';
-		require_once ABSPATH . 'wp-admin/includes/image.php';
-
-		$tmp_file = download_url( $image_url );
-
-		if ( is_wp_error( $tmp_file ) ) {
-			surfer_log_image_import_error( $image_url, $tmp_file->get_error_message() );
-			return 0;
-		}
-
-		$file_name = surfer_resolve_image_file_name( $image_url, $tmp_file );
-
-		// Mime type is intentionally not provided - WordPress detects it from the
-		// downloaded file, so images from URLs without an extension are not rejected.
-		$attachment_id = media_handle_sideload(
-			array(
-				'tmp_name' => $tmp_file,
-				'name'     => $file_name,
-			),
-			0
-		);
-
-		if ( file_exists( $tmp_file ) ) {
-			@unlink( $tmp_file ); // phpcs:ignore
-		}
-
-		if ( is_wp_error( $attachment_id ) || empty( $attachment_id ) ) {
-			$error_message = is_wp_error( $attachment_id ) ? $attachment_id->get_error_message() : 'attachment was not created';
-			surfer_log_image_import_error( $image_url, $error_message );
-			return 0;
-		}
-
-		update_post_meta( $attachment_id, 'surfer_file_name', $file_name );
-		update_post_meta( $attachment_id, 'surfer_file_original_url', $image_url );
-		surfer_forget_attachment_by_original_url( $image_url );
 
 		return array(
-			'url' => wp_get_attachment_url( $attachment_id ),
-			'id'  => $attachment_id,
+			'url' => $url,
+			'id'  => (int) $attachment_id,
 		);
+	}
+
+	/**
+	 * Upload image from Surfer to WordPress media library.
+	 *
+	 * @param string $image_url - URL to the image.
+	 * @param string $image_alt - Alt text for the image.
+	 * @return array{status: string, attachment_id?: int} - see surfer_download_image().
+	 */
+	private function download_image_sync( $image_url, $image_alt ) {
+		return surfer_download_image( (string) $image_url, (string) $image_alt );
 	}
 
 	/**
@@ -280,7 +212,7 @@ class Content_Parser {
 	/**
 	 * Extract inner HTML for provided node.
 	 *
-	 * @param DOMElement $node - node element to parse.
+	 * @param \DOMElement $node - node element to parse.
 	 * @return string
 	 */
 	protected function get_inner_html( $node ) {
@@ -305,8 +237,8 @@ class Content_Parser {
 	 * If link is internal, removes target attribute.
 	 * If link is external, adds target="_blank" attribute.
 	 *
-	 * @param DOMDocument $doc - DOMDocument object.
-	 * @return DOMDocument
+	 * @param \DOMDocument $doc - DOMDocument object.
+	 * @return \DOMDocument
 	 */
 	protected function handle_links_target_attribute( $doc ) {
 
@@ -352,6 +284,26 @@ class Content_Parser {
 	 */
 	public function set_image_processing_mode( $processing_mode ) {
 		$this->image_processing_mode = $processing_mode;
+	}
+
+	/**
+	 * Sets the callback that receives images left for the background download.
+	 *
+	 * @param callable $handler - called with image URL and alt text.
+	 * @return void
+	 */
+	public function set_pending_image_handler( callable $handler ) {
+		$this->pending_image_handler = $handler;
+	}
+
+	/**
+	 * Sets the callback that decides if another image of the import may be downloaded.
+	 *
+	 * @param callable $handler - called with image URL, returns bool.
+	 * @return void
+	 */
+	public function set_image_limit_handler( callable $handler ) {
+		$this->image_limit_handler = $handler;
 	}
 
 	/**
